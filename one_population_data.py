@@ -60,3 +60,39 @@ def simulate(N,L,m,length,n):
                 out['v'] += [v]
                 out['group'] += [[0,0]]
     return out
+
+def simulate2(N,T,L,m,length,n):
+    demography = msprime.Demography()
+    demography.add_population(name="A", initial_size=N[0])
+    demography.add_population(name = 'B', initial_size = N[0])
+    demography.add_population(name = 'anc', initial_size = N[0])
+    demography.add_population_split(time = T, derived = ['A','B'], ancestral = 'anc')
+
+     # bb is the number of bits simulated.
+    bb = m*length
+
+    # kk is measured in centiMorgans.
+    kk = m*100
+    ts = msprime.sim_ancestry(
+        samples={"A": n,'B':n}, 
+        demography=demography, 
+        recombination_rate = 1/length,
+        sequence_length = bb,
+    )
+    all = all_ibd_segments(ts)
+    out = {'index':[],'fraction':[],'u':[],'v':[],'group':[]}
+    for i in range(len(L)-1):
+        u = L[i]
+        v = L[i+1]
+
+        #for within data, have (n*2)*(n*2-1)/2 pairs and for between data we have (n*2)*(n*2) pairs.
+        #within A
+        for j in range(n*2):
+            for k in range(n*2,n*4):
+                a = [l for l in all[j][k] if u<l*kk<v]
+                out['index'] += [[j,k]]
+                out['fraction'] += [sum(a)]
+                out['u'] += [u]
+                out['v'] += [v]
+                out['group'] += [[0,1]]
+    return out
