@@ -3,14 +3,15 @@ from methods import sim_snp_admix, var_matrix
 import msprime
 import tskit
 import numpy as np
-
+import pandas as pd
+import json
 
 seed = 42
 length = 1e7
-n=10
+n= 20
 m = 2
-N = [4000,3000,5000,5000,20000,20000]
-T = [30,100,1000]
+N = [3000,3000,3000,3000,7000,7000]
+T = [30,150,400]
 
 ts = sim_snp_admix(N,T,m,length,n,seed)
 mut_ts = msprime.sim_mutations(ts,discrete_genome=False, rate=1e-8, random_seed=1234)
@@ -42,7 +43,7 @@ def run_cmd(cmd):
 run_cmd(f"plink --vcf {vcf_file} --make-bed --out {output_prefix} --double-id")
 
 # LD pruning
-run_cmd(f"plink --bfile {output_prefix} --indep-pairwise 50 5 0.2 --out {pruned_prefix}")
+run_cmd(f"plink --bfile {output_prefix} --indep-pairwise 100 5 0.2 --out {pruned_prefix}")
 
 # Extract pruned SNPs
 run_cmd(f"plink --bfile {output_prefix} --extract {pruned_prefix}.prune.in --make-bed --out {pruned_prefix}_final")
@@ -79,4 +80,19 @@ for variant in filtered_ts.variants():
 
 freq_array = np.array(freq_array)
 
-data = var_matrix(freq_array, b = n)
+# Using the block method
+# b is the number of SNPs per block
+output_mean, output_var = var_matrix(freq_array, b = 20)
+# m is the number of populations
+m = len(output_mean)
+
+cols = ['group','d_mean','d_var']
+data = pd.DataFrame(columns = cols)
+for i in range(m):
+    for j in range(i,m):
+        new_row = [[i,j],output_mean[i][j], output_var[i][j]]
+        data.loc[len(data)] = new_row
+json_snp = data.to_dict(orient='list')
+with open('json_snp.json', 'w') as f:
+    json.dump(json_snp, f)
+

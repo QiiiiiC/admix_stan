@@ -271,8 +271,11 @@ def sim_snp_admix(N,T,m,length,n,seed):
     return ts
 
 def var_matrix(freq_array,b):
+    # b is the number of SNPs per blocks
+    # n is the number of SNPs
     n = len(freq_array)
     m = len(freq_array[0])
+    # bb is the number of blocks
     bb = n//b
     output_mean_total = [np.zeros((m,m)) for i in range(bb)]
     output_var = np.zeros((m,m))
@@ -280,7 +283,7 @@ def var_matrix(freq_array,b):
         for i in range(m):
             for j in range(i,m):
                 total_sum = 0
-                for k in range(l*10,(l*10+10)):
+                for k in range(l*b,(l*b+b)):
                     mean = sum(freq_array[k])/m
                     total_sum += (freq_array[k][i]-mean)*(freq_array[k][j]-mean)
                     
