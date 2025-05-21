@@ -10,8 +10,8 @@ seed = 42
 length = 1e7
 n= 20
 m = 2
-N = [3000,3000,3000,3000,7000,7000]
-T = [30,150,400]
+N = [3000,3000,3000,3000,3000,3000]
+T = [30,150,800]
 
 ts = sim_snp_admix(N,T,m,length,n,seed)
 mut_ts = msprime.sim_mutations(ts,discrete_genome=False, rate=1e-8, random_seed=1234)
@@ -54,11 +54,12 @@ with open(f"{pruned_prefix}.prune.in", "r") as file:
     pruned_snps_list = [line.strip() for line in file]
 pruned_snps_list = [int(i) for i in pruned_snps_list]
 
+
 pop1_samples = np.arange(2*n)  
 pop2_samples = np.arange(2*n, 4*n)  
 pop3_samples = np.arange(4*n,6*n)
 pop4_samples = np.arange(6*n,8*n)
-Ld_class = tskit.LdCalculator(filtered_ts)
+
 
 freq_array = []
 freq_ = []
@@ -75,22 +76,24 @@ for variant in filtered_ts.variants():
         freq_pop = np.sum(genotypes)/(8*n)
         if freq_pop > 0.1:
             final_pruned.append(variant.index)
-        freq_.append(freq_pop)
-        freq_array.append([freq_pop1, freq_pop2,freq_pop3,freq_pop4])
+            freq_.append(freq_pop)
+            freq_array.append([freq_pop1, freq_pop2,freq_pop3,freq_pop4])
 
 freq_array = np.array(freq_array)
 
+adjusted_ratio = sum([i*(1-i) for i in freq_])/len(freq_)
+print(adjusted_ratio)
 # Using the block method
 # b is the number of SNPs per block
 output_mean, output_var = var_matrix(freq_array, b = 20)
 # m is the number of populations
 m = len(output_mean)
 
-cols = ['group','d_mean','d_var']
+cols = ['group','d_mean','d_var','adjusted_factor']
 data = pd.DataFrame(columns = cols)
 for i in range(m):
     for j in range(i,m):
-        new_row = [[i,j],output_mean[i][j], output_var[i][j]]
+        new_row = [[i,j],output_mean[i][j], output_var[i][j],adjusted_ratio]
         data.loc[len(data)] = new_row
 json_snp = data.to_dict(orient='list')
 with open('json_snp.json', 'w') as f:

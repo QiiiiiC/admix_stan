@@ -4,76 +4,77 @@ namespace snp_alone_model_namespace {
 using stan::model::model_base_crtp;
 using namespace stan::math;
 stan::math::profile_map profiles__;
-static constexpr std::array<const char*, 78> locations_array__ =
+static constexpr std::array<const char*, 81> locations_array__ =
   {" (found before start of program)",
-  " (in 'snp_alone.stan', line 11, column 4 to column 39)",
-  " (in 'snp_alone.stan', line 12, column 4 to column 38)",
-  " (in 'snp_alone.stan', line 13, column 4 to column 45)",
-  " (in 'snp_alone.stan', line 14, column 4 to column 33)",
-  " (in 'snp_alone.stan', line 18, column 3 to column 21)",
-  " (in 'snp_alone.stan', line 19, column 3 to column 26)",
-  " (in 'snp_alone.stan', line 20, column 3 to column 21)",
-  " (in 'snp_alone.stan', line 21, column 3 to column 26)",
-  " (in 'snp_alone.stan', line 22, column 3 to column 35)",
-  " (in 'snp_alone.stan', line 23, column 3 to column 30)",
-  " (in 'snp_alone.stan', line 24, column 3 to column 21)",
-  " (in 'snp_alone.stan', line 25, column 3 to column 28)",
-  " (in 'snp_alone.stan', line 26, column 3 to column 34)",
-  " (in 'snp_alone.stan', line 27, column 3 to column 18)",
-  " (in 'snp_alone.stan', line 28, column 3 to column 17)",
-  " (in 'snp_alone.stan', line 29, column 3 to column 80)",
-  " (in 'snp_alone.stan', line 30, column 3 to column 36)",
-  " (in 'snp_alone.stan', line 31, column 3 to column 17)",
-  " (in 'snp_alone.stan', line 32, column 3 to column 28)",
-  " (in 'snp_alone.stan', line 33, column 3 to column 17)",
-  " (in 'snp_alone.stan', line 34, column 3 to column 18)",
-  " (in 'snp_alone.stan', line 35, column 3 to column 155)",
-  " (in 'snp_alone.stan', line 36, column 3 to column 195)",
+  " (in 'snp_alone.stan', line 12, column 4 to column 39)",
+  " (in 'snp_alone.stan', line 13, column 4 to column 38)",
+  " (in 'snp_alone.stan', line 14, column 4 to column 45)",
+  " (in 'snp_alone.stan', line 15, column 4 to column 33)",
+  " (in 'snp_alone.stan', line 19, column 3 to column 21)",
+  " (in 'snp_alone.stan', line 20, column 3 to column 26)",
+  " (in 'snp_alone.stan', line 21, column 3 to column 21)",
+  " (in 'snp_alone.stan', line 22, column 3 to column 26)",
+  " (in 'snp_alone.stan', line 23, column 3 to column 35)",
+  " (in 'snp_alone.stan', line 24, column 3 to column 30)",
+  " (in 'snp_alone.stan', line 25, column 3 to column 21)",
+  " (in 'snp_alone.stan', line 26, column 3 to column 28)",
+  " (in 'snp_alone.stan', line 27, column 3 to column 34)",
+  " (in 'snp_alone.stan', line 28, column 3 to column 18)",
+  " (in 'snp_alone.stan', line 29, column 3 to column 17)",
+  " (in 'snp_alone.stan', line 30, column 3 to column 71)",
+  " (in 'snp_alone.stan', line 31, column 3 to column 36)",
+  " (in 'snp_alone.stan', line 32, column 3 to column 17)",
+  " (in 'snp_alone.stan', line 33, column 3 to column 28)",
+  " (in 'snp_alone.stan', line 34, column 3 to column 17)",
+  " (in 'snp_alone.stan', line 35, column 3 to column 18)",
+  " (in 'snp_alone.stan', line 36, column 3 to column 155)",
   " (in 'snp_alone.stan', line 37, column 3 to column 195)",
   " (in 'snp_alone.stan', line 38, column 3 to column 195)",
-  " (in 'snp_alone.stan', line 39, column 3 to column 155)",
-  " (in 'snp_alone.stan', line 40, column 3 to column 195)",
+  " (in 'snp_alone.stan', line 39, column 3 to column 195)",
+  " (in 'snp_alone.stan', line 40, column 3 to column 155)",
   " (in 'snp_alone.stan', line 41, column 3 to column 195)",
-  " (in 'snp_alone.stan', line 42, column 3 to column 155)",
-  " (in 'snp_alone.stan', line 43, column 3 to column 194)",
-  " (in 'snp_alone.stan', line 44, column 3 to column 155)",
-  " (in 'snp_alone.stan', line 50, column 6 to column 31)",
-  " (in 'snp_alone.stan', line 49, column 19 to line 51, column 5)",
-  " (in 'snp_alone.stan', line 49, column 4 to line 51, column 5)",
-  " (in 'snp_alone.stan', line 52, column 4 to column 23)",
-  " (in 'snp_alone.stan', line 53, column 4 to column 28)",
-  " (in 'snp_alone.stan', line 94, column 8 to column 57)",
+  " (in 'snp_alone.stan', line 42, column 3 to column 195)",
+  " (in 'snp_alone.stan', line 43, column 3 to column 155)",
+  " (in 'snp_alone.stan', line 44, column 3 to column 194)",
+  " (in 'snp_alone.stan', line 45, column 3 to column 155)",
+  " (in 'snp_alone.stan', line 51, column 6 to column 31)",
+  " (in 'snp_alone.stan', line 50, column 19 to line 52, column 5)",
+  " (in 'snp_alone.stan', line 50, column 4 to line 52, column 5)",
+  " (in 'snp_alone.stan', line 53, column 4 to column 32)",
+  " (in 'snp_alone.stan', line 54, column 4 to column 23)",
+  " (in 'snp_alone.stan', line 56, column 4 to column 28)",
+  " (in 'snp_alone.stan', line 97, column 8 to column 80)",
+  " (in 'snp_alone.stan', line 96, column 48 to line 98, column 7)",
+  " (in 'snp_alone.stan', line 96, column 11 to line 98, column 7)",
+  " (in 'snp_alone.stan', line 94, column 8 to column 80)",
   " (in 'snp_alone.stan', line 93, column 48 to line 95, column 7)",
-  " (in 'snp_alone.stan', line 93, column 11 to line 95, column 7)",
-  " (in 'snp_alone.stan', line 91, column 8 to column 57)",
+  " (in 'snp_alone.stan', line 93, column 11 to line 98, column 7)",
+  " (in 'snp_alone.stan', line 91, column 8 to column 80)",
   " (in 'snp_alone.stan', line 90, column 48 to line 92, column 7)",
-  " (in 'snp_alone.stan', line 90, column 11 to line 95, column 7)",
-  " (in 'snp_alone.stan', line 88, column 8 to column 57)",
+  " (in 'snp_alone.stan', line 90, column 11 to line 98, column 7)",
+  " (in 'snp_alone.stan', line 88, column 8 to column 80)",
   " (in 'snp_alone.stan', line 87, column 48 to line 89, column 7)",
-  " (in 'snp_alone.stan', line 87, column 11 to line 95, column 7)",
-  " (in 'snp_alone.stan', line 85, column 8 to column 57)",
-  " (in 'snp_alone.stan', line 84, column 48 to line 86, column 7)",
-  " (in 'snp_alone.stan', line 84, column 11 to line 95, column 7)",
-  " (in 'snp_alone.stan', line 81, column 8 to column 57)",
-  " (in 'snp_alone.stan', line 80, column 48 to line 82, column 7)",
-  " (in 'snp_alone.stan', line 80, column 11 to line 95, column 7)",
-  " (in 'snp_alone.stan', line 76, column 8 to column 57)",
-  " (in 'snp_alone.stan', line 75, column 48 to line 77, column 7)",
-  " (in 'snp_alone.stan', line 75, column 11 to line 95, column 7)",
-  " (in 'snp_alone.stan', line 72, column 8 to column 57)",
-  " (in 'snp_alone.stan', line 71, column 48 to line 73, column 7)",
-  " (in 'snp_alone.stan', line 71, column 11 to line 95, column 7)",
-  " (in 'snp_alone.stan', line 67, column 8 to column 57)",
-  " (in 'snp_alone.stan', line 66, column 48 to line 68, column 7)",
-  " (in 'snp_alone.stan', line 66, column 11 to line 95, column 7)",
-  " (in 'snp_alone.stan', line 63, column 8 to column 57)",
-  " (in 'snp_alone.stan', line 62, column 48 to line 64, column 7)",
-  " (in 'snp_alone.stan', line 62, column 11 to line 95, column 7)",
-  " (in 'snp_alone.stan', line 59, column 8 to column 57)",
-  " (in 'snp_alone.stan', line 58, column 43 to line 60, column 7)",
-  " (in 'snp_alone.stan', line 58, column 6 to line 95, column 7)",
-  " (in 'snp_alone.stan', line 55, column 23 to line 96, column 5)",
-  " (in 'snp_alone.stan', line 55, column 4 to line 96, column 5)",
+  " (in 'snp_alone.stan', line 87, column 11 to line 98, column 7)",
+  " (in 'snp_alone.stan', line 84, column 8 to column 80)",
+  " (in 'snp_alone.stan', line 83, column 48 to line 85, column 7)",
+  " (in 'snp_alone.stan', line 83, column 11 to line 98, column 7)",
+  " (in 'snp_alone.stan', line 79, column 8 to column 80)",
+  " (in 'snp_alone.stan', line 78, column 48 to line 80, column 7)",
+  " (in 'snp_alone.stan', line 78, column 11 to line 98, column 7)",
+  " (in 'snp_alone.stan', line 75, column 8 to column 80)",
+  " (in 'snp_alone.stan', line 74, column 48 to line 76, column 7)",
+  " (in 'snp_alone.stan', line 74, column 11 to line 98, column 7)",
+  " (in 'snp_alone.stan', line 70, column 8 to column 80)",
+  " (in 'snp_alone.stan', line 69, column 48 to line 71, column 7)",
+  " (in 'snp_alone.stan', line 69, column 11 to line 98, column 7)",
+  " (in 'snp_alone.stan', line 66, column 8 to column 80)",
+  " (in 'snp_alone.stan', line 65, column 48 to line 67, column 7)",
+  " (in 'snp_alone.stan', line 65, column 11 to line 98, column 7)",
+  " (in 'snp_alone.stan', line 62, column 8 to column 80)",
+  " (in 'snp_alone.stan', line 61, column 43 to line 63, column 7)",
+  " (in 'snp_alone.stan', line 61, column 6 to line 98, column 7)",
+  " (in 'snp_alone.stan', line 58, column 23 to line 99, column 5)",
+  " (in 'snp_alone.stan', line 58, column 4 to line 99, column 5)",
   " (in 'snp_alone.stan', line 2, column 2 to column 21)",
   " (in 'snp_alone.stan', line 3, column 2 to column 22)",
   " (in 'snp_alone.stan', line 4, column 8 to column 13)",
@@ -82,7 +83,9 @@ static constexpr std::array<const char*, 78> locations_array__ =
   " (in 'snp_alone.stan', line 5, column 2 to column 37)",
   " (in 'snp_alone.stan', line 6, column 2 to column 30)",
   " (in 'snp_alone.stan', line 7, column 8 to column 13)",
-  " (in 'snp_alone.stan', line 7, column 2 to column 27)"};
+  " (in 'snp_alone.stan', line 7, column 2 to column 27)",
+  " (in 'snp_alone.stan', line 8, column 8 to column 13)",
+  " (in 'snp_alone.stan', line 8, column 2 to column 47)"};
 class snp_alone_model final : public model_base_crtp<snp_alone_model> {
  private:
   int N_obs;
@@ -91,6 +94,7 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
   std::vector<double> d_var;
   double ancestral_T;
   std::vector<std::vector<int>> group;
+  std::vector<double> adjusted_factor;
  public:
   ~snp_alone_model() {}
   snp_alone_model(stan::io::var_context& context__, unsigned int
@@ -114,54 +118,54 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
     try {
       int pos__ = std::numeric_limits<int>::min();
       pos__ = 1;
-      current_statement__ = 69;
+      current_statement__ = 70;
       context__.validate_dims("data initialization", "N_obs", "int",
         std::vector<size_t>{});
       N_obs = std::numeric_limits<int>::min();
-      current_statement__ = 69;
-      N_obs = context__.vals_i("N_obs")[(1 - 1)];
-      current_statement__ = 69;
-      stan::math::check_greater_or_equal(function__, "N_obs", N_obs, 0);
       current_statement__ = 70;
+      N_obs = context__.vals_i("N_obs")[(1 - 1)];
+      current_statement__ = 70;
+      stan::math::check_greater_or_equal(function__, "N_obs", N_obs, 0);
+      current_statement__ = 71;
       context__.validate_dims("data initialization", "N_pop", "double",
         std::vector<size_t>{});
       N_pop = std::numeric_limits<double>::quiet_NaN();
-      current_statement__ = 70;
-      N_pop = context__.vals_r("N_pop")[(1 - 1)];
-      current_statement__ = 70;
-      stan::math::check_greater_or_equal(function__, "N_pop", N_pop, 0);
       current_statement__ = 71;
-      stan::math::validate_non_negative_index("d_mean", "N_obs", N_obs);
+      N_pop = context__.vals_r("N_pop")[(1 - 1)];
+      current_statement__ = 71;
+      stan::math::check_greater_or_equal(function__, "N_pop", N_pop, 0);
       current_statement__ = 72;
+      stan::math::validate_non_negative_index("d_mean", "N_obs", N_obs);
+      current_statement__ = 73;
       context__.validate_dims("data initialization", "d_mean", "double",
         std::vector<size_t>{static_cast<size_t>(N_obs)});
       d_mean = std::vector<double>(N_obs,
                  std::numeric_limits<double>::quiet_NaN());
-      current_statement__ = 72;
-      d_mean = context__.vals_r("d_mean");
       current_statement__ = 73;
-      stan::math::validate_non_negative_index("d_var", "N_obs", N_obs);
+      d_mean = context__.vals_r("d_mean");
       current_statement__ = 74;
+      stan::math::validate_non_negative_index("d_var", "N_obs", N_obs);
+      current_statement__ = 75;
       context__.validate_dims("data initialization", "d_var", "double",
         std::vector<size_t>{static_cast<size_t>(N_obs)});
       d_var = std::vector<double>(N_obs,
                 std::numeric_limits<double>::quiet_NaN());
-      current_statement__ = 74;
-      d_var = context__.vals_r("d_var");
-      current_statement__ = 74;
-      stan::math::check_greater_or_equal(function__, "d_var", d_var, 0);
       current_statement__ = 75;
+      d_var = context__.vals_r("d_var");
+      current_statement__ = 75;
+      stan::math::check_greater_or_equal(function__, "d_var", d_var, 0);
+      current_statement__ = 76;
       context__.validate_dims("data initialization", "ancestral_T", "double",
         std::vector<size_t>{});
       ancestral_T = std::numeric_limits<double>::quiet_NaN();
-      current_statement__ = 75;
+      current_statement__ = 76;
       ancestral_T = context__.vals_r("ancestral_T")[(1 - 1)];
-      current_statement__ = 75;
+      current_statement__ = 76;
       stan::math::check_greater_or_equal(function__, "ancestral_T",
         ancestral_T, 0);
-      current_statement__ = 76;
-      stan::math::validate_non_negative_index("group", "N_obs", N_obs);
       current_statement__ = 77;
+      stan::math::validate_non_negative_index("group", "N_obs", N_obs);
+      current_statement__ = 78;
       context__.validate_dims("data initialization", "group", "int",
         std::vector<size_t>{static_cast<size_t>(N_obs),
           static_cast<size_t>(2)});
@@ -169,7 +173,7 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                 std::vector<int>(2, std::numeric_limits<int>::min()));
       {
         std::vector<int> group_flat__;
-        current_statement__ = 77;
+        current_statement__ = 78;
         group_flat__ = context__.vals_i("group");
         pos__ = 1;
         for (int sym1__ = 1; sym1__ <= 2; ++sym1__) {
@@ -181,6 +185,19 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
           }
         }
       }
+      current_statement__ = 79;
+      stan::math::validate_non_negative_index("adjusted_factor", "N_obs",
+        N_obs);
+      current_statement__ = 80;
+      context__.validate_dims("data initialization", "adjusted_factor",
+        "double", std::vector<size_t>{static_cast<size_t>(N_obs)});
+      adjusted_factor = std::vector<double>(N_obs,
+                          std::numeric_limits<double>::quiet_NaN());
+      current_statement__ = 80;
+      adjusted_factor = context__.vals_r("adjusted_factor");
+      current_statement__ = 80;
+      stan::math::check_greater_or_equal(function__, "adjusted_factor",
+        adjusted_factor, 0);
     } catch (const std::exception& e) {
       stan::lang::rethrow_located(e, locations_array__[current_statement__]);
     }
@@ -274,8 +291,8 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
       a_14 = 0;
       local_scalar_t__ a_22 = DUMMY_VAR__;
       current_statement__ = 16;
-      a_22 = ((c7 + (stan::math::pow(fraction, 2) * (c2 + c5))) +
-        (stan::math::pow((1 - fraction), 2) * (c4 + c5)));
+      a_22 = (((c7 + (stan::math::pow(fraction, 2) * c2)) +
+        (stan::math::pow((1 - fraction), 2) * c4)) + c5);
       local_scalar_t__ a_23 = DUMMY_VAR__;
       current_statement__ = 17;
       a_23 = (((1 - fraction) * c4) + c5);
@@ -356,12 +373,14 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                              stan::model::index_uni(i)), 1, 100000));
         }
         current_statement__ = 35;
-        lp_accum__.add(stan::math::uniform_lpdf<propto__>(T1, 1, T2));
+        lp_accum__.add(stan::math::uniform_lpdf<propto__>(T2, 1, ancestral_T));
         current_statement__ = 36;
+        lp_accum__.add(stan::math::uniform_lpdf<propto__>(T1, 1, T2));
+        current_statement__ = 37;
         lp_accum__.add(stan::math::uniform_lpdf<propto__>(fraction, 0, 1));
-        current_statement__ = 68;
+        current_statement__ = 69;
         for (int i = 1; i <= N_obs; ++i) {
-          current_statement__ = 66;
+          current_statement__ = 67;
           if ((stan::math::primitive_value(
                  stan::math::logical_eq(
                    stan::model::rvalue(
@@ -375,14 +394,16 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                     stan::model::rvalue(group, "group",
                       stan::model::index_uni(i)), "group[i]",
                     stan::model::index_uni(2)), 0)))) {
-            current_statement__ = 64;
+            current_statement__ = 65;
             lp_accum__.add(stan::math::normal_lpdf<false>(
                              stan::model::rvalue(d_mean, "d_mean",
-                               stan::model::index_uni(i)), W_11,
+                               stan::model::index_uni(i)), ((W_11 * 100) *
+                             stan::model::rvalue(adjusted_factor,
+                               "adjusted_factor", stan::model::index_uni(1))),
                              stan::model::rvalue(d_var, "d_var",
                                stan::model::index_uni(i))));
           } else {
-            current_statement__ = 63;
+            current_statement__ = 64;
             if ((stan::math::primitive_value(
                    stan::math::logical_eq(
                      stan::model::rvalue(
@@ -396,14 +417,16 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                       stan::model::rvalue(group, "group",
                         stan::model::index_uni(i)), "group[i]",
                       stan::model::index_uni(2)), 1)))) {
-              current_statement__ = 61;
+              current_statement__ = 62;
               lp_accum__.add(stan::math::normal_lpdf<false>(
                                stan::model::rvalue(d_mean, "d_mean",
-                                 stan::model::index_uni(i)), W_12,
+                                 stan::model::index_uni(i)), ((W_12 * 100) *
+                               stan::model::rvalue(adjusted_factor,
+                                 "adjusted_factor", stan::model::index_uni(1))),
                                stan::model::rvalue(d_var, "d_var",
                                  stan::model::index_uni(i))));
             } else {
-              current_statement__ = 60;
+              current_statement__ = 61;
               if ((stan::math::primitive_value(
                      stan::math::logical_eq(
                        stan::model::rvalue(
@@ -417,14 +440,18 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                         stan::model::rvalue(group, "group",
                           stan::model::index_uni(i)), "group[i]",
                         stan::model::index_uni(2)), 2)))) {
-                current_statement__ = 58;
+                current_statement__ = 59;
                 lp_accum__.add(stan::math::normal_lpdf<false>(
                                  stan::model::rvalue(d_mean, "d_mean",
-                                   stan::model::index_uni(i)), W_13,
+                                   stan::model::index_uni(i)), ((W_13 * 100)
+                                 *
+                                 stan::model::rvalue(adjusted_factor,
+                                   "adjusted_factor",
+                                   stan::model::index_uni(1))),
                                  stan::model::rvalue(d_var, "d_var",
                                    stan::model::index_uni(i))));
               } else {
-                current_statement__ = 57;
+                current_statement__ = 58;
                 if ((stan::math::primitive_value(
                        stan::math::logical_eq(
                          stan::model::rvalue(
@@ -438,14 +465,18 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                           stan::model::rvalue(group, "group",
                             stan::model::index_uni(i)), "group[i]",
                           stan::model::index_uni(2)), 3)))) {
-                  current_statement__ = 55;
+                  current_statement__ = 56;
                   lp_accum__.add(stan::math::normal_lpdf<false>(
                                    stan::model::rvalue(d_mean, "d_mean",
-                                     stan::model::index_uni(i)), W_14,
+                                     stan::model::index_uni(i)), ((W_14 *
+                                   100) *
+                                   stan::model::rvalue(adjusted_factor,
+                                     "adjusted_factor",
+                                     stan::model::index_uni(1))),
                                    stan::model::rvalue(d_var, "d_var",
                                      stan::model::index_uni(i))));
                 } else {
-                  current_statement__ = 54;
+                  current_statement__ = 55;
                   if ((stan::math::primitive_value(
                          stan::math::logical_eq(
                            stan::model::rvalue(
@@ -459,14 +490,18 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                             stan::model::rvalue(group, "group",
                               stan::model::index_uni(i)), "group[i]",
                             stan::model::index_uni(2)), 1)))) {
-                    current_statement__ = 52;
+                    current_statement__ = 53;
                     lp_accum__.add(stan::math::normal_lpdf<false>(
                                      stan::model::rvalue(d_mean, "d_mean",
-                                       stan::model::index_uni(i)), W_22,
+                                       stan::model::index_uni(i)), ((W_22 *
+                                     100) *
+                                     stan::model::rvalue(adjusted_factor,
+                                       "adjusted_factor",
+                                       stan::model::index_uni(1))),
                                      stan::model::rvalue(d_var, "d_var",
                                        stan::model::index_uni(i))));
                   } else {
-                    current_statement__ = 51;
+                    current_statement__ = 52;
                     if ((stan::math::primitive_value(
                            stan::math::logical_eq(
                              stan::model::rvalue(
@@ -480,14 +515,18 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                               stan::model::rvalue(group, "group",
                                 stan::model::index_uni(i)), "group[i]",
                               stan::model::index_uni(2)), 2)))) {
-                      current_statement__ = 49;
+                      current_statement__ = 50;
                       lp_accum__.add(stan::math::normal_lpdf<false>(
                                        stan::model::rvalue(d_mean, "d_mean",
-                                         stan::model::index_uni(i)), W_23,
+                                         stan::model::index_uni(i)), ((W_23 *
+                                       100) *
+                                       stan::model::rvalue(adjusted_factor,
+                                         "adjusted_factor",
+                                         stan::model::index_uni(1))),
                                        stan::model::rvalue(d_var, "d_var",
                                          stan::model::index_uni(i))));
                     } else {
-                      current_statement__ = 48;
+                      current_statement__ = 49;
                       if ((stan::math::primitive_value(
                              stan::math::logical_eq(
                                stan::model::rvalue(
@@ -501,15 +540,19 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                                 stan::model::rvalue(group, "group",
                                   stan::model::index_uni(i)), "group[i]",
                                 stan::model::index_uni(2)), 3)))) {
-                        current_statement__ = 46;
+                        current_statement__ = 47;
                         lp_accum__.add(stan::math::normal_lpdf<false>(
                                          stan::model::rvalue(d_mean,
                                            "d_mean",
-                                           stan::model::index_uni(i)), W_24,
+                                           stan::model::index_uni(i)), ((W_24
+                                         * 100) *
+                                         stan::model::rvalue(adjusted_factor,
+                                           "adjusted_factor",
+                                           stan::model::index_uni(1))),
                                          stan::model::rvalue(d_var, "d_var",
                                            stan::model::index_uni(i))));
                       } else {
-                        current_statement__ = 45;
+                        current_statement__ = 46;
                         if ((stan::math::primitive_value(
                                stan::math::logical_eq(
                                  stan::model::rvalue(
@@ -523,17 +566,21 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                                   stan::model::rvalue(group, "group",
                                     stan::model::index_uni(i)), "group[i]",
                                   stan::model::index_uni(2)), 2)))) {
-                          current_statement__ = 43;
+                          current_statement__ = 44;
                           lp_accum__.add(stan::math::normal_lpdf<false>(
                                            stan::model::rvalue(d_mean,
                                              "d_mean",
                                              stan::model::index_uni(i)),
-                                           W_33,
+                                           ((W_33 * 100) *
+                                           stan::model::rvalue(
+                                             adjusted_factor,
+                                             "adjusted_factor",
+                                             stan::model::index_uni(1))),
                                            stan::model::rvalue(d_var,
                                              "d_var",
                                              stan::model::index_uni(i))));
                         } else {
-                          current_statement__ = 42;
+                          current_statement__ = 43;
                           if ((stan::math::primitive_value(
                                  stan::math::logical_eq(
                                    stan::model::rvalue(
@@ -548,17 +595,21 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                                     stan::model::rvalue(group, "group",
                                       stan::model::index_uni(i)), "group[i]",
                                     stan::model::index_uni(2)), 3)))) {
-                            current_statement__ = 40;
+                            current_statement__ = 41;
                             lp_accum__.add(stan::math::normal_lpdf<false>(
                                              stan::model::rvalue(d_mean,
                                                "d_mean",
                                                stan::model::index_uni(i)),
-                                             W_34,
+                                             ((W_34 * 100) *
+                                             stan::model::rvalue(
+                                               adjusted_factor,
+                                               "adjusted_factor",
+                                               stan::model::index_uni(1))),
                                              stan::model::rvalue(d_var,
                                                "d_var",
                                                stan::model::index_uni(i))));
                           } else {
-                            current_statement__ = 39;
+                            current_statement__ = 40;
                             if ((stan::math::primitive_value(
                                    stan::math::logical_eq(
                                      stan::model::rvalue(
@@ -574,12 +625,16 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                                         stan::model::index_uni(i)),
                                       "group[i]", stan::model::index_uni(2)),
                                     3)))) {
-                              current_statement__ = 37;
+                              current_statement__ = 38;
                               lp_accum__.add(stan::math::normal_lpdf<false>(
                                                stan::model::rvalue(d_mean,
                                                  "d_mean",
                                                  stan::model::index_uni(i)),
-                                               W_44,
+                                               ((W_44 * 100) *
+                                               stan::model::rvalue(
+                                                 adjusted_factor,
+                                                 "adjusted_factor",
+                                                 stan::model::index_uni(1))),
                                                stan::model::rvalue(d_var,
                                                  "d_var",
                                                  stan::model::index_uni(i))));
@@ -682,8 +737,8 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
       a_14 = 0;
       local_scalar_t__ a_22 = DUMMY_VAR__;
       current_statement__ = 16;
-      a_22 = ((c7 + (stan::math::pow(fraction, 2) * (c2 + c5))) +
-        (stan::math::pow((1 - fraction), 2) * (c4 + c5)));
+      a_22 = (((c7 + (stan::math::pow(fraction, 2) * c2)) +
+        (stan::math::pow((1 - fraction), 2) * c4)) + c5);
       local_scalar_t__ a_23 = DUMMY_VAR__;
       current_statement__ = 17;
       a_23 = (((1 - fraction) * c4) + c5);
@@ -764,12 +819,14 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                              stan::model::index_uni(i)), 1, 100000));
         }
         current_statement__ = 35;
-        lp_accum__.add(stan::math::uniform_lpdf<propto__>(T1, 1, T2));
+        lp_accum__.add(stan::math::uniform_lpdf<propto__>(T2, 1, ancestral_T));
         current_statement__ = 36;
+        lp_accum__.add(stan::math::uniform_lpdf<propto__>(T1, 1, T2));
+        current_statement__ = 37;
         lp_accum__.add(stan::math::uniform_lpdf<propto__>(fraction, 0, 1));
-        current_statement__ = 68;
+        current_statement__ = 69;
         for (int i = 1; i <= N_obs; ++i) {
-          current_statement__ = 66;
+          current_statement__ = 67;
           if ((stan::math::primitive_value(
                  stan::math::logical_eq(
                    stan::model::rvalue(
@@ -783,14 +840,16 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                     stan::model::rvalue(group, "group",
                       stan::model::index_uni(i)), "group[i]",
                     stan::model::index_uni(2)), 0)))) {
-            current_statement__ = 64;
+            current_statement__ = 65;
             lp_accum__.add(stan::math::normal_lpdf<false>(
                              stan::model::rvalue(d_mean, "d_mean",
-                               stan::model::index_uni(i)), W_11,
+                               stan::model::index_uni(i)), ((W_11 * 100) *
+                             stan::model::rvalue(adjusted_factor,
+                               "adjusted_factor", stan::model::index_uni(1))),
                              stan::model::rvalue(d_var, "d_var",
                                stan::model::index_uni(i))));
           } else {
-            current_statement__ = 63;
+            current_statement__ = 64;
             if ((stan::math::primitive_value(
                    stan::math::logical_eq(
                      stan::model::rvalue(
@@ -804,14 +863,16 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                       stan::model::rvalue(group, "group",
                         stan::model::index_uni(i)), "group[i]",
                       stan::model::index_uni(2)), 1)))) {
-              current_statement__ = 61;
+              current_statement__ = 62;
               lp_accum__.add(stan::math::normal_lpdf<false>(
                                stan::model::rvalue(d_mean, "d_mean",
-                                 stan::model::index_uni(i)), W_12,
+                                 stan::model::index_uni(i)), ((W_12 * 100) *
+                               stan::model::rvalue(adjusted_factor,
+                                 "adjusted_factor", stan::model::index_uni(1))),
                                stan::model::rvalue(d_var, "d_var",
                                  stan::model::index_uni(i))));
             } else {
-              current_statement__ = 60;
+              current_statement__ = 61;
               if ((stan::math::primitive_value(
                      stan::math::logical_eq(
                        stan::model::rvalue(
@@ -825,14 +886,18 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                         stan::model::rvalue(group, "group",
                           stan::model::index_uni(i)), "group[i]",
                         stan::model::index_uni(2)), 2)))) {
-                current_statement__ = 58;
+                current_statement__ = 59;
                 lp_accum__.add(stan::math::normal_lpdf<false>(
                                  stan::model::rvalue(d_mean, "d_mean",
-                                   stan::model::index_uni(i)), W_13,
+                                   stan::model::index_uni(i)), ((W_13 * 100)
+                                 *
+                                 stan::model::rvalue(adjusted_factor,
+                                   "adjusted_factor",
+                                   stan::model::index_uni(1))),
                                  stan::model::rvalue(d_var, "d_var",
                                    stan::model::index_uni(i))));
               } else {
-                current_statement__ = 57;
+                current_statement__ = 58;
                 if ((stan::math::primitive_value(
                        stan::math::logical_eq(
                          stan::model::rvalue(
@@ -846,14 +911,18 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                           stan::model::rvalue(group, "group",
                             stan::model::index_uni(i)), "group[i]",
                           stan::model::index_uni(2)), 3)))) {
-                  current_statement__ = 55;
+                  current_statement__ = 56;
                   lp_accum__.add(stan::math::normal_lpdf<false>(
                                    stan::model::rvalue(d_mean, "d_mean",
-                                     stan::model::index_uni(i)), W_14,
+                                     stan::model::index_uni(i)), ((W_14 *
+                                   100) *
+                                   stan::model::rvalue(adjusted_factor,
+                                     "adjusted_factor",
+                                     stan::model::index_uni(1))),
                                    stan::model::rvalue(d_var, "d_var",
                                      stan::model::index_uni(i))));
                 } else {
-                  current_statement__ = 54;
+                  current_statement__ = 55;
                   if ((stan::math::primitive_value(
                          stan::math::logical_eq(
                            stan::model::rvalue(
@@ -867,14 +936,18 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                             stan::model::rvalue(group, "group",
                               stan::model::index_uni(i)), "group[i]",
                             stan::model::index_uni(2)), 1)))) {
-                    current_statement__ = 52;
+                    current_statement__ = 53;
                     lp_accum__.add(stan::math::normal_lpdf<false>(
                                      stan::model::rvalue(d_mean, "d_mean",
-                                       stan::model::index_uni(i)), W_22,
+                                       stan::model::index_uni(i)), ((W_22 *
+                                     100) *
+                                     stan::model::rvalue(adjusted_factor,
+                                       "adjusted_factor",
+                                       stan::model::index_uni(1))),
                                      stan::model::rvalue(d_var, "d_var",
                                        stan::model::index_uni(i))));
                   } else {
-                    current_statement__ = 51;
+                    current_statement__ = 52;
                     if ((stan::math::primitive_value(
                            stan::math::logical_eq(
                              stan::model::rvalue(
@@ -888,14 +961,18 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                               stan::model::rvalue(group, "group",
                                 stan::model::index_uni(i)), "group[i]",
                               stan::model::index_uni(2)), 2)))) {
-                      current_statement__ = 49;
+                      current_statement__ = 50;
                       lp_accum__.add(stan::math::normal_lpdf<false>(
                                        stan::model::rvalue(d_mean, "d_mean",
-                                         stan::model::index_uni(i)), W_23,
+                                         stan::model::index_uni(i)), ((W_23 *
+                                       100) *
+                                       stan::model::rvalue(adjusted_factor,
+                                         "adjusted_factor",
+                                         stan::model::index_uni(1))),
                                        stan::model::rvalue(d_var, "d_var",
                                          stan::model::index_uni(i))));
                     } else {
-                      current_statement__ = 48;
+                      current_statement__ = 49;
                       if ((stan::math::primitive_value(
                              stan::math::logical_eq(
                                stan::model::rvalue(
@@ -909,15 +986,19 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                                 stan::model::rvalue(group, "group",
                                   stan::model::index_uni(i)), "group[i]",
                                 stan::model::index_uni(2)), 3)))) {
-                        current_statement__ = 46;
+                        current_statement__ = 47;
                         lp_accum__.add(stan::math::normal_lpdf<false>(
                                          stan::model::rvalue(d_mean,
                                            "d_mean",
-                                           stan::model::index_uni(i)), W_24,
+                                           stan::model::index_uni(i)), ((W_24
+                                         * 100) *
+                                         stan::model::rvalue(adjusted_factor,
+                                           "adjusted_factor",
+                                           stan::model::index_uni(1))),
                                          stan::model::rvalue(d_var, "d_var",
                                            stan::model::index_uni(i))));
                       } else {
-                        current_statement__ = 45;
+                        current_statement__ = 46;
                         if ((stan::math::primitive_value(
                                stan::math::logical_eq(
                                  stan::model::rvalue(
@@ -931,17 +1012,21 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                                   stan::model::rvalue(group, "group",
                                     stan::model::index_uni(i)), "group[i]",
                                   stan::model::index_uni(2)), 2)))) {
-                          current_statement__ = 43;
+                          current_statement__ = 44;
                           lp_accum__.add(stan::math::normal_lpdf<false>(
                                            stan::model::rvalue(d_mean,
                                              "d_mean",
                                              stan::model::index_uni(i)),
-                                           W_33,
+                                           ((W_33 * 100) *
+                                           stan::model::rvalue(
+                                             adjusted_factor,
+                                             "adjusted_factor",
+                                             stan::model::index_uni(1))),
                                            stan::model::rvalue(d_var,
                                              "d_var",
                                              stan::model::index_uni(i))));
                         } else {
-                          current_statement__ = 42;
+                          current_statement__ = 43;
                           if ((stan::math::primitive_value(
                                  stan::math::logical_eq(
                                    stan::model::rvalue(
@@ -956,17 +1041,21 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                                     stan::model::rvalue(group, "group",
                                       stan::model::index_uni(i)), "group[i]",
                                     stan::model::index_uni(2)), 3)))) {
-                            current_statement__ = 40;
+                            current_statement__ = 41;
                             lp_accum__.add(stan::math::normal_lpdf<false>(
                                              stan::model::rvalue(d_mean,
                                                "d_mean",
                                                stan::model::index_uni(i)),
-                                             W_34,
+                                             ((W_34 * 100) *
+                                             stan::model::rvalue(
+                                               adjusted_factor,
+                                               "adjusted_factor",
+                                               stan::model::index_uni(1))),
                                              stan::model::rvalue(d_var,
                                                "d_var",
                                                stan::model::index_uni(i))));
                           } else {
-                            current_statement__ = 39;
+                            current_statement__ = 40;
                             if ((stan::math::primitive_value(
                                    stan::math::logical_eq(
                                      stan::model::rvalue(
@@ -982,12 +1071,16 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
                                         stan::model::index_uni(i)),
                                       "group[i]", stan::model::index_uni(2)),
                                     3)))) {
-                              current_statement__ = 37;
+                              current_statement__ = 38;
                               lp_accum__.add(stan::math::normal_lpdf<false>(
                                                stan::model::rvalue(d_mean,
                                                  "d_mean",
                                                  stan::model::index_uni(i)),
-                                               W_44,
+                                               ((W_44 * 100) *
+                                               stan::model::rvalue(
+                                                 adjusted_factor,
+                                                 "adjusted_factor",
+                                                 stan::model::index_uni(1))),
                                                stan::model::rvalue(d_var,
                                                  "d_var",
                                                  stan::model::index_uni(i))));
@@ -1126,8 +1219,8 @@ class snp_alone_model final : public model_base_crtp<snp_alone_model> {
       current_statement__ = 15;
       a_14 = 0;
       current_statement__ = 16;
-      a_22 = ((c7 + (stan::math::pow(fraction, 2) * (c2 + c5))) +
-        (stan::math::pow((1 - fraction), 2) * (c4 + c5)));
+      a_22 = (((c7 + (stan::math::pow(fraction, 2) * c2)) +
+        (stan::math::pow((1 - fraction), 2) * c4)) + c5);
       current_statement__ = 17;
       a_23 = (((1 - fraction) * c4) + c5);
       current_statement__ = 18;

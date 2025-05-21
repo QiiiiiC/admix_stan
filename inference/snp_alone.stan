@@ -5,6 +5,7 @@ data {
   array[N_obs] real<lower = 0> d_var;
   real<lower = 0> ancestral_T;      // the true ancestral time
   array[N_obs,2] int group;
+  array[N_obs] real<lower = 0> adjusted_factor;
 }
 
 parameters {
@@ -49,49 +50,51 @@ model {
     for (i in 1:4) {
       N[i] ~ uniform(1,100000);     //prior such that mean is 5000 and variance is 2000
     }
+    T2 ~ uniform(1,ancestral_T);
     T1 ~ uniform(1,T2);
+
     fraction ~ uniform(0,1);
 
     for (i in 1:N_obs) {
         // The sharing between any population and the outergroup is ignored as there's no parameter involved.
       // This is the sharing between population A and A
       if (group[i][1]==0 && group[i][2]==0){
-        target += normal_lpdf(d_mean[i]| W_11, d_var[i]);
+        target += normal_lpdf(d_mean[i]| W_11*100*adjusted_factor[1], d_var[i]);
       }
       // This is the sharing between population A and Admix
       else if (group[i][1]==0 && group[i][2]==1){
-        target += normal_lpdf(d_mean[i]| W_12, d_var[i]);
+        target += normal_lpdf(d_mean[i]| W_12*100*adjusted_factor[1], d_var[i]);
       }
       // This is the sharing between population A and B
       else if (group[i][1]==0 && group[i][2]==2){
-        target += normal_lpdf(d_mean[i]| W_13, d_var[i]);
+        target += normal_lpdf(d_mean[i]| W_13*100*adjusted_factor[1], d_var[i]);
       }
 
       // This is the sharing between population Admix and Admix
       else if (group[i][1]==0 && group[i][2]==3){
-        target += normal_lpdf(d_mean[i]| W_14, d_var[i]);
+        target += normal_lpdf(d_mean[i]| W_14*100*adjusted_factor[1], d_var[i]);
       }
       // This is the sharing number between population Admix and B
       else if (group[i][1]==1 && group[i][2]==1){
-        target += normal_lpdf(d_mean[i]| W_22, d_var[i]);
+        target += normal_lpdf(d_mean[i]| W_22*100*adjusted_factor[1], d_var[i]);
       }
 
       // This is the sharing number between population B and B
       else if (group[i][1]==1 && group[i][2]==2){
-        target += normal_lpdf(d_mean[i]| W_23, d_var[i]);
+        target += normal_lpdf(d_mean[i]| W_23*100*adjusted_factor[1], d_var[i]);
       }
 
       else if (group[i][1]==1 && group[i][2]==3){
-        target += normal_lpdf(d_mean[i]| W_24, d_var[i]);
+        target += normal_lpdf(d_mean[i]| W_24*100*adjusted_factor[1], d_var[i]);
       }
       else if (group[i][1]==2 && group[i][2]==2){
-        target += normal_lpdf(d_mean[i]| W_33, d_var[i]);
+        target += normal_lpdf(d_mean[i]| W_33*100*adjusted_factor[1], d_var[i]);
       }
       else if (group[i][1]==2 && group[i][2]==3){
-        target += normal_lpdf(d_mean[i]| W_34, d_var[i]);
+        target += normal_lpdf(d_mean[i]| W_34*100*adjusted_factor[1], d_var[i]);
       }
       else if (group[i][1]==3 && group[i][2]==3){
-        target += normal_lpdf(d_mean[i]| W_44, d_var[i]);
+        target += normal_lpdf(d_mean[i]| W_44*100*adjusted_factor[1], d_var[i]);
       }
     }
 

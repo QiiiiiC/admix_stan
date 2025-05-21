@@ -1,0 +1,26 @@
+PLINK v1.9.0-b.7.7 64-bit (22 Oct 2024)
+Options in effect:
+  --bfile plink_output
+  --indep-pairwise 100 5 0.2
+  --out pruned
+
+Hostname: DESKTOP-KK92U79
+Working directory: e:\admix_stan\inference
+Start time: Tue May 20 23:24:42 2025
+
+Random number seed: 1747779882
+64734 MB RAM detected; reserving 32367 MB for main workspace.
+20747 variants loaded from .bim file.
+80 people (0 males, 0 females, 80 ambiguous) loaded from .fam.
+Ambiguous sex IDs written to pruned.nosex .
+Using 1 thread (no multithreaded calculations invoked).
+Before main variant filters, 80 founders and 0 nonfounders present.
+Calculating allele frequencies... done.
+Total genotyping rate is exactly 1.
+20747 variants and 80 people pass filters and QC.
+Note: No phenotypes present.
+Pruned 11776 variants from chromosome 1, leaving 8971.
+Pruning complete.  11776 of 20747 variants removed.
+Marker lists written to pruned.prune.in and pruned.prune.out .
+
+End time: Tue May 20 23:24:42 2025

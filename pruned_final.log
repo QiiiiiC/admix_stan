@@ -7,20 +7,20 @@ Options in effect:
 
 Hostname: DESKTOP-KK92U79
 Working directory: E:\admix_stan
-Start time: Fri May 16 12:29:01 2025
+Start time: Wed May 21 12:11:29 2025
 
-Random number seed: 1747394941
+Random number seed: 1747825889
 64734 MB RAM detected; reserving 32367 MB for main workspace.
-20747 variants loaded from .bim file.
+6896 variants loaded from .bim file.
 80 people (0 males, 0 females, 80 ambiguous) loaded from .fam.
 Ambiguous sex IDs written to pruned_final.nosex .
---extract: 8971 variants remaining.
+--extract: 3408 variants remaining.
 Using 1 thread (no multithreaded calculations invoked).
 Before main variant filters, 80 founders and 0 nonfounders present.
 Calculating allele frequencies... done.
 Total genotyping rate is exactly 1.
-8971 variants and 80 people pass filters and QC.
+3408 variants and 80 people pass filters and QC.
 Note: No phenotypes present.
 --make-bed to pruned_final.bed + pruned_final.bim + pruned_final.fam ... done.
 
-End time: Fri May 16 12:29:01 2025
+End time: Wed May 21 12:11:29 2025
