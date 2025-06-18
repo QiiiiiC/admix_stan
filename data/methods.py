@@ -60,7 +60,7 @@ def all_ibd_segments(ts):
             segment_lengths_m[i][j].append((ts.sequence_length-last_left_m[i][j])/ts.sequence_length)
     return segment_lengths_m
 
-def sim_ibd_admix(N,T,L,m,length,n,seed):
+def sim_ibd_admix(N,T,L,m,length,n,alpha,seed):
     #Set the follwing model as the default model.
     demography = msprime.Demography()
     demography.add_population(name="A", initial_size=N[0])
@@ -69,7 +69,7 @@ def sim_ibd_admix(N,T,L,m,length,n,seed):
     demography.add_population(name="OUTER", initial_size=N[3])
     demography.add_population(name ='SUB_ANC', initial_size = N[4])
     demography.add_population(name = 'ANC', initial_size = N[5])
-    demography.add_admixture(time=T[0], derived='ADMIX', ancestral=["A","B"],proportions = [0.25,0.75])
+    demography.add_admixture(time=T[0], derived='ADMIX', ancestral=["A","B"],proportions = [alpha,1-alpha])
     demography.add_population_split(time=T[1], derived=["A", "B"], ancestral="SUB_ANC")
     demography.add_population_split(time = T[2], derived = ['SUB_ANC','OUTER'], ancestral = 'ANC')
     
