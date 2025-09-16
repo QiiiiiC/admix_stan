@@ -1,0 +1,27 @@
+PLINK v1.9.0-b.7.8 64-bit (15 Jun 2025)
+Options in effect:
+  --allow-no-sex
+  --bfile pruned_final
+  --out pruned_final_pca
+  --pca 10 header tabs
+
+Hostname: MacBookPro
+Working directory: /Users/qichen/Desktop/admix_stan/inference
+Start time: Tue Sep 16 13:16:06 2025
+
+Random number seed: 1758024966
+16384 MB RAM detected; reserving 8192 MB for main workspace.
+8971 variants loaded from .bim file.
+80 people (0 males, 0 females, 80 ambiguous) loaded from .fam.
+Ambiguous sex IDs written to pruned_final_pca.nosex .
+Using up to 11 threads (change this with --threads).
+Before main variant filters, 80 founders and 0 nonfounders present.
+Calculating allele frequencies... done.
+Total genotyping rate is exactly 1.
+8971 variants and 80 people pass filters and QC.
+Note: No phenotypes present.
+Relationship matrix calculation complete.
+--pca: Results saved to pruned_final_pca.eigenval and pruned_final_pca.eigenvec
+.
+
+End time: Tue Sep 16 13:16:06 2025
