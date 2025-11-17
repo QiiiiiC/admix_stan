@@ -64,7 +64,6 @@ pop4_samples = np.arange(6*n,8*n)
 freq_array = []
 freq_ = []
 final_pruned = []
-last_position = 0
 for variant in filtered_ts.variants():
     if variant.index in pruned_snps_list:
           

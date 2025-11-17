@@ -1,0 +1,27 @@
+PLINK v1.9.0-b.8 64-bit (22 Oct 2024)
+Options in effect:
+  --bfile ./plink_output/plink_output
+  --extract ./plink_output/pruned.prune.in
+  --make-bed
+  --out ./plink_output/pruned_final
+
+Hostname: Mac
+Working directory: /Users/qi/Documents/GitHub/admix_stan/new_pipeline
+Start time: Wed Nov  5 22:23:29 2025
+
+Random number seed: 1762352609
+24576 MB RAM detected; reserving 12288 MB for main workspace.
+58156 variants loaded from .bim file.
+80 people (0 males, 0 females, 80 ambiguous) loaded from .fam.
+Ambiguous sex IDs written to ./plink_output/pruned_final.nosex .
+--extract: 2920 variants remaining.
+Using 1 thread (no multithreaded calculations invoked).
+Before main variant filters, 80 founders and 0 nonfounders present.
+Calculating allele frequencies... done.
+Total genotyping rate is exactly 1.
+2920 variants and 80 people pass filters and QC.
+Note: No phenotypes present.
+--make-bed to ./plink_output/pruned_final.bed + ./plink_output/pruned_final.bim
++ ./plink_output/pruned_final.fam ... done.
+
+End time: Wed Nov  5 22:23:29 2025
