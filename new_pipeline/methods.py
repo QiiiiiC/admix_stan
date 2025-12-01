@@ -224,3 +224,7 @@ def snp_data_blocked(
     W_hat = np.mean(W_blocks, axis=0)
     
     return W_hat, W_blocks
+
+
+
+
