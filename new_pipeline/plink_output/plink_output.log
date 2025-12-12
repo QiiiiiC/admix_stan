@@ -1,29 +1,31 @@
 PLINK v1.9.0-b.8 64-bit (22 Oct 2024)
 Options in effect:
+  --allow-extra-chr
   --double-id
   --make-bed
-  --out ./plink_output/plink_output
-  --vcf ./plink_output/snp_ts.vcf
+  --out plink_output/plink_output
+  --silent
+  --vcf plink_output/snp_ts.vcf
 
-Hostname: Mac
-Working directory: /Users/qi/Documents/GitHub/admix_stan/new_pipeline
-Start time: Wed Nov  5 22:23:29 2025
+Hostname: QideMac-Studio.local
+Working directory: /Users/qichen/github/admix_stan/new_pipeline
+Start time: Thu Dec 11 23:57:01 2025
 
-Random number seed: 1762352609
-24576 MB RAM detected; reserving 12288 MB for main workspace.
---vcf: ./plink_output/plink_output-temporary.bed +
-./plink_output/plink_output-temporary.bim +
-./plink_output/plink_output-temporary.fam written.
-58156 variants loaded from .bim file.
+Random number seed: 1765497421
+32768 MB RAM detected; reserving 16384 MB for main workspace.
+--vcf: plink_output/plink_output-temporary.bed +
+plink_output/plink_output-temporary.bim +
+plink_output/plink_output-temporary.fam written.
+85164 variants loaded from .bim file.
 80 people (0 males, 0 females, 80 ambiguous) loaded from .fam.
-Ambiguous sex IDs written to ./plink_output/plink_output.nosex .
+Ambiguous sex IDs written to plink_output/plink_output.nosex .
 Using 1 thread (no multithreaded calculations invoked).
 Before main variant filters, 80 founders and 0 nonfounders present.
 Calculating allele frequencies... done.
 Total genotyping rate is exactly 1.
-58156 variants and 80 people pass filters and QC.
+85164 variants and 80 people pass filters and QC.
 Note: No phenotypes present.
---make-bed to ./plink_output/plink_output.bed + ./plink_output/plink_output.bim
-+ ./plink_output/plink_output.fam ... done.
+--make-bed to plink_output/plink_output.bed + plink_output/plink_output.bim +
+plink_output/plink_output.fam ... done.
 
-End time: Wed Nov  5 22:23:29 2025
+End time: Thu Dec 11 23:57:01 2025

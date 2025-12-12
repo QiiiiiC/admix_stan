@@ -174,20 +174,20 @@ def simulate_snp_pruning(
 
 
 
-    for variant in filtered_ts.variants():
-        if variant.index in pruned_snps_list:
+    # for variant in filtered_ts.variants():
+    #     if variant.index in pruned_snps_list:
             
-            genotypes = variant.genotypes  
-            freq_pop = np.sum(genotypes)/filtered_ts.num_individuals
-            if freq_pop > 0.1:
-                freq_array = [np.sum(genotypes[sample]) / len(sample) for sample in popn_samples]
+    #         genotypes = variant.genotypes  
+    #         freq_pop = np.sum(genotypes)/filtered_ts.num_individuals
+    #         if freq_pop > 0.1:
+    #             freq_array = [np.sum(genotypes[sample]) / len(sample) for sample in popn_samples]
 
-            if freq_pop > 0.1:
-                final_pruned.append(variant.index)
-                freq_.append(freq_pop)
-                freq_array.append([freq_pop1, freq_pop2,freq_pop3,freq_pop4])
+    #         if freq_pop > 0.1:
+    #             final_pruned.append(variant.index)
+    #             freq_.append(freq_pop)
+    #             freq_array.append([freq_pop1, freq_pop2,freq_pop3,freq_pop4])
 
-    freq_array = np.array(freq_array)
+    # freq_array = np.array(freq_array)
 
     return pruned_snps_list
 

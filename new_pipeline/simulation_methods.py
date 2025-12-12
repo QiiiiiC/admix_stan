@@ -1,0 +1,246 @@
+import msprime
+import tskit
+import numpy as np
+import subprocess
+from pathlib import Path
+from typing import Dict, Optional, List, Tuple
+
+def to_msprime_demography(topology):
+    """
+    Converts the custom DemographicTopology into an msprime.Demography object.
+    """
+    # 1. Initialize msprime Demography
+    demography = msprime.Demography()
+
+    # 2. Define Populations (Nodes)
+    # msprime requires us to register populations before using them in events.
+    # We use the 'ne' attribute from your Node as 'initial_size'.
+    for name, node in topology.nodes.items():
+        if node.ne is None:
+            # Fallback if Ne isn't set (though it should be for valid sims)
+            print(f"Warning: Node {name} has no Ne set. Defaulting to 1.")
+            ne_val = 1
+        else:
+            ne_val = node.ne
+        
+        demography.add_population(name=name, initial_size=ne_val)
+
+    # 3. Process Events in Order
+    # Your events are ordered. We iterate through them and map them to msprime calls.
+    for event in topology.ordered_events:
+        
+        if event['type'] == 'MERGE':
+            # Logic: Two populations (children) merge into one (parent) backwards in time.
+            # In msprime: add_population_split(time, derived=[c1, c2], ancestral=parent)
+            c1, c2 = event['children']
+            parent = event['parent']
+            
+            # The event time is the START of the parent node
+            time = topology.nodes[parent].time_start
+            
+            if time is None:
+                raise ValueError(f"Time not set for merge event into {parent}")
+                
+            demography.add_population_split(
+                time=time,
+                derived=[c1, c2],
+                ancestral=parent
+            )
+
+        elif event['type'] == 'ADMIXTURE':
+            # Logic: One population (child) splits into two (parents) backwards in time.
+            # In msprime: add_admixture(time, derived=child, ancestral=[p1, p2], proportions=...)
+            child = event['child']
+            p1, p2 = event['parents']
+            
+            # The event time is the END of the child node (when it looks back and splits)
+            time = topology.nodes[child].time_end
+            
+            if time is None:
+                raise ValueError(f"Time not set for admixture event of {child}")
+
+            # Retrieve fractions
+            # Note: msprime expects proportions in the order of 'ancestral' list [p1, p2]
+            frac1 = topology.nodes[child].admixture_fractions.get(p1)
+            frac2 = topology.nodes[child].admixture_fractions.get(p2)
+            
+            if frac1 is None or frac2 is None:
+                raise ValueError(f"Admixture fractions not set for {child}")
+
+            demography.add_admixture(
+                time=time,
+                derived=child,
+                ancestral=[p1, p2],
+                proportions=[frac1, frac2]
+            )
+
+    # 4. Sort events
+    # msprime requires events to be added, but sometimes internal sorting is needed 
+    # if the input order wasn't strictly chronological. 
+    # However, Demography.sort_events() usually handles this automatically before simulation.
+    demography.sort_events()
+    
+    return demography
+
+def simulate_msprime(
+    topology, # this is the class DemographicTopology
+    samples_per_pop= None,
+    n_per_leaf=20,
+    sequence_length = 1e7,
+    recombination_rate = 1e-8,
+    mutation_rate = 1e-8,
+    seed = 42
+):
+    """
+    Simulates ancestry and mutations using msprime based on the topology.
+    """
+    # Default: sample from initial leaves
+    leaves = topology.initial_leaves
+    
+    if samples_per_pop is None:
+        samples_per_pop = {pop: n_per_leaf for pop in leaves}
+
+    # Convert to msprime demography
+    dem = to_msprime_demography(topology)
+    
+    # Create SampleSet
+    # Note: We assume leaves are at time 0. If your topology has ancient leaves, 
+    # you might need to check node.time_start.
+    samples = []
+    for p in leaves:
+        if p in samples_per_pop:
+            samples.append(msprime.SampleSet(samples_per_pop[p], population=p, time=0))
+
+    # Simulate Ancestry
+    ts = msprime.sim_ancestry(
+        samples=samples,
+        demography=dem,
+        sequence_length=sequence_length,
+        recombination_rate=recombination_rate,
+        random_seed=seed,
+    )
+    
+    # Simulate Mutations
+    mts = msprime.sim_mutations(ts, rate=mutation_rate, random_seed=seed, discrete_genome=False)
+    
+    return mts
+
+
+def simulate_snp_pruning(
+        mts,
+        topology,
+        temporal_folder,
+        cutoff_time = None, 
+        cutoff_freq = 0.1,
+        pruning_blocksize = 100,
+        pruning_blockstep = 5,
+        pruning_r2 = 0.2
+):
+    """
+    Filters for ancient mutations, exports to VCF, runs PLINK for LD pruning, 
+    and returns the pruned SNP indices and their frequency array.
+    """
+    p = Path(temporal_folder)
+    p.mkdir(parents=True, exist_ok=True)
+    
+    # 1. Filter for Ancestral Mutations
+    if cutoff_time is None:
+        # Default: Keep everything
+        filtered_ts = mts
+    else:
+        # Keep only mutations OLDER than cutoff_time
+        sites_to_remove = []
+        for mut in mts.mutations():
+            if mts.node(mut.node).time < cutoff_time:
+                sites_to_remove.append(mut.site)
+        
+        if sites_to_remove:
+            filtered_ts = mts.delete_sites(sites_to_remove)
+        else:
+            filtered_ts = mts
+
+    # 2. Export VCF for PLINK
+    vcf_path = p / "snp_ts.vcf"
+    with open(vcf_path, "w") as vcf_file:
+        filtered_ts.write_vcf(vcf_file)
+
+    output_prefix = p / "snp_ts"
+    pruned_prefix = p / "pruned"
+
+    def run_cmd(cmd):
+        print(f"Running: {cmd}")
+        subprocess.run(cmd, shell=True, check=True)
+
+    # 3. Run PLINK Commands
+    # Convert VCF to BED
+    run_cmd(f"plink --vcf {vcf_path} --make-bed --out {output_prefix} --double-id --allow-extra-chr --silent")
+
+    # LD pruning
+    run_cmd(f"plink --bfile {output_prefix} --indep-pairwise {pruning_blocksize} {pruning_blockstep} {pruning_r2} --out {pruned_prefix} --allow-extra-chr --silent")
+
+    # Extract pruned SNPs list
+    prune_in_file = p / "pruned.prune.in"
+    if not prune_in_file.exists():
+        raise FileNotFoundError(f"PLINK did not generate {prune_in_file}. Check if plink is installed.")
+        
+    with open(prune_in_file, "r") as file:
+        pruned_ids = set(line.strip() for line in file)
+
+    print(f"LD pruning complete. Kept {len(pruned_ids)} SNPs.")
+
+    # 4. Compute Frequencies for Pruned SNPs
+    # Map population names to sample indices in the tree sequence
+    leaves = topology.initial_leaves
+    
+    # Build dictionary of {pop_name: [sample_ids]}
+    pop_sample_ids = {}
+    for pop_name in leaves:
+        # Get the ID of the population from the tree sequence
+        # Note: msprime demography keeps the names
+        pop_id = -1
+        for p in filtered_ts.populations():
+            if p.metadata.get('name') == pop_name:
+                pop_id = p.id
+                break
+        
+        if pop_id != -1:
+            pop_sample_ids[pop_name] = filtered_ts.samples(population=pop_id)
+        else:
+            pop_sample_ids[pop_name] = []
+
+    final_pruned_indices = []
+    freq_matrix = []
+
+    # Iterate variants and check if they are in the pruned set
+    for variant in filtered_ts.variants():
+        # The VCF ID is usually the variant.site.id or similar. 
+        # tskit write_vcf uses site IDs by default.
+        # We assume the ID in pruned_ids matches str(variant.site.id)
+        # Note: variant.index is the index in the list, variant.site.id is the permanent ID.
+        
+        if str(variant.index) in pruned_ids:
+            
+            genotypes = variant.genotypes
+            total_samples = len(genotypes)
+            global_freq = np.sum(genotypes) / total_samples
+            
+            # Optional: Global MAF filter (e.g. > 0.1)
+            if global_freq > cutoff_freq:
+                # Calculate frequency per population
+                row = []
+                for pop in leaves:
+                    s_indices = pop_sample_ids[pop]
+                    if len(s_indices) > 0:
+                        # Extract genotypes for this population
+                        pop_genos = genotypes[s_indices]
+                        freq = np.sum(pop_genos) / len(pop_genos)
+                        row.append(freq)
+                    else:
+                        row.append(0.0)
+                
+                freq_matrix.append(row)
+                final_pruned_indices.append(variant.site.id)
+
+    freq_array = np.array(freq_matrix) 
+
+    return final_pruned_indices, freq_array

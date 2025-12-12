@@ -4,8 +4,8 @@ import numpy as np
 import msprime
 import subprocess
 import tskit
-
-
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 class Node:
     """
@@ -205,6 +205,178 @@ class DemographicTopology:
     # ==========================================
     # UTILITIES & VALIDATION
     # ==========================================
+
+    def plot_demography(self, scale=True, ax=None):
+        """
+        Plots the demographic topology.
+        
+        Args:
+            scale (bool): If True, Y-axis is generations (requires parameters).
+                          If False, Y-axis is event rank (topology only).
+            ax: Optional matplotlib axis.
+        """
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(10, 6))
+
+        # =========================================================
+        # 1. Determine Y-coordinates (Vertical Placement)
+        # =========================================================
+        node_y_intervals = {} # Stores [y_start, y_end] for each node
+
+        if scale:
+            # --- REAL TIME MODE ---
+            # Use the actual time parameters set by the user
+            # Collect all time points to determine margins
+            all_times = {0.0}
+            for n in self.nodes.values():
+                if n.time_start is not None: all_times.add(n.time_start)
+                if n.time_end is not None and n.time_end != float('inf'): all_times.add(n.time_end)
+            
+            max_time = max(all_times) if all_times else 0
+            top_margin = max_time * 1.1 if max_time > 0 else 1.0
+
+            for name, node in self.nodes.items():
+                start = node.time_start if node.time_start is not None else 0.0
+                end = node.time_end if node.time_end is not None else 0.0
+                if end == float('inf'): end = top_margin
+                node_y_intervals[name] = [start, end]
+                
+            ax.set_ylabel("Time (Generations ago)")
+
+        else:
+            # --- TOPOLOGY ONLY MODE ---
+            # Ignore time parameters. Use Event Rank (1, 2, 3...)
+            # Leaves start at 0.
+            
+            # Initialize all nodes to start at 0 and end at "undefined"
+            for name in self.nodes:
+                node_y_intervals[name] = [0.0, None] # [start, end]
+
+            # Iterate through events to build the vertical structure
+            # Each event bumps the Y-axis up by 1 unit
+            max_rank = len(self.ordered_events) + 1
+            
+            for i, event in enumerate(self.ordered_events):
+                rank = float(i + 1)
+                
+                if event['type'] == 'MERGE':
+                    c1, c2 = event['children']
+                    parent = event['parent']
+                    
+                    # Children end at this rank
+                    node_y_intervals[c1][1] = rank
+                    node_y_intervals[c2][1] = rank
+                    
+                    # Parent starts at this rank
+                    node_y_intervals[parent][0] = rank
+                    
+                elif event['type'] == 'ADMIXTURE':
+                    child = event['child']
+                    p1, p2 = event['parents']
+                    
+                    # Child ends at this rank
+                    node_y_intervals[child][1] = rank
+                    
+                    # Parents start at this rank
+                    node_y_intervals[p1][0] = rank
+                    node_y_intervals[p2][0] = rank
+
+            # Close off any nodes that didn't end (Roots)
+            for name in node_y_intervals:
+                if node_y_intervals[name][1] is None:
+                    node_y_intervals[name][1] = max_rank
+            
+            ax.set_ylabel("Event Rank (Unscaled)")
+
+
+        # =========================================================
+        # 2. Determine X-coordinates (Horizontal Placement)
+        # =========================================================
+        node_x = {}
+        
+        # Initialize leaves evenly spaced
+        for i, name in enumerate(self.initial_leaves):
+            node_x[name] = float(i)
+
+        # Process events to assign X to ancestors
+        for event in self.ordered_events:
+            if event['type'] == 'MERGE':
+                c1, c2 = event['children']
+                parent = event['parent']
+                if c1 in node_x and c2 in node_x:
+                    node_x[parent] = (node_x[c1] + node_x[c2]) / 2.0
+                else:
+                    node_x[parent] = 0.0 
+
+            elif event['type'] == 'ADMIXTURE':
+                child = event['child']
+                p1, p2 = event['parents']
+                if child in node_x:
+                    base_x = node_x[child]
+                    offset = 0.5
+                    node_x[p1] = base_x - offset
+                    node_x[p2] = base_x + offset
+
+        # =========================================================
+        # 3. Drawing
+        # =========================================================
+        colors = plt.cm.get_cmap('tab20', len(self.nodes))
+        
+        # Draw Nodes (Vertical Pipes)
+        for i, (name, interval) in enumerate(node_y_intervals.items()):
+            if name not in node_x: continue
+            
+            y_bottom, y_top = interval
+            x = node_x[name]
+            
+            ax.plot([x, x], [y_bottom, y_top], lw=6, color=colors(i), solid_capstyle='butt')
+            
+            # Label the node (midpoint)
+            label_y = (y_bottom + y_top) / 2
+            ax.text(x + 0.1, label_y, name, fontsize=9, color='black', ha='left')
+
+        # Draw Connectors (Horizontal Lines)
+        for i, event in enumerate(self.ordered_events):
+            # Rank for unscaled is simply i+1, for scaled we need to lookup times
+            if scale:
+                # Need to lookup the specific time based on event type
+                if event['type'] == 'MERGE':
+                    time_val = self.nodes[event['parent']].time_start
+                else:
+                    time_val = self.nodes[event['child']].time_end
+                if time_val is None: time_val = 0
+                y_pos = time_val
+            else:
+                y_pos = float(i + 1)
+
+            if event['type'] == 'MERGE':
+                c1, c2 = event['children']
+                x1, x2 = node_x[c1], node_x[c2]
+                ax.plot([x1, x2], [y_pos, y_pos], 'k-', lw=2)
+
+            elif event['type'] == 'ADMIXTURE':
+                child = event['child']
+                p1, p2 = event['parents']
+                x1, x2 = node_x[p1], node_x[p2]
+                ax.plot([x1, x2], [y_pos, y_pos], 'k--', lw=2)
+                
+                # Only print fractions if scaled (and thus presumably parameters exist)
+                if scale:
+                    frac1 = self.nodes[child].admixture_fractions.get(p1)
+                    frac2 = self.nodes[child].admixture_fractions.get(p2)
+                    
+                    l1 = f"{frac1:.2f}" if isinstance(frac1, (int, float)) else "?"
+                    l2 = f"{frac2:.2f}" if isinstance(frac2, (int, float)) else "?"
+
+                    ax.text(node_x[p1], y_pos, l1, ha='center', va='bottom', fontsize=8)
+                    ax.text(node_x[p2], y_pos, l2, ha='center', va='bottom', fontsize=8)
+
+        ax.set_title("Demographic Topology")
+        ax.grid(True, linestyle=':', alpha=0.6)
+        ax.set_xticks([])
+        
+        if not ax:
+            plt.show()
 
     def is_valid(self):
         """
