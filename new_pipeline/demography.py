@@ -56,6 +56,7 @@ class DemographicTopology:
         self.nodes = {}
         self.ordered_events = [] # Stores events in the order they are added (1, 2, 3...)
         self.initial_leaves = leaf_names # Keep track of starting nodes for validation
+        self.n_admix = 0
         
         # Step 1: Initialize present-day samples (Leaves)
         for name in leaf_names:
@@ -132,13 +133,15 @@ class DemographicTopology:
         self.nodes[parent_2_name] = p2
 
         # Record Event
-        event_id = len(self.ordered_events) + 1
+        event_id = len(self.ordered_events) 
         self.ordered_events.append({
             'id': event_id,
             'type': 'ADMIXTURE',
             'child': child_name,
             'parents': [parent_1_name, parent_2_name]
         })
+
+        self.n_admix += 1
         print(f"[Event {event_id}] Admixture: {child_name} -> {parent_1_name} & {parent_2_name}")
 
     # ==========================================
@@ -449,14 +452,14 @@ class DemographicTopology:
         - If Admixture: Identity Matrix (as requested)
         """
         # 1. Map all nodes to indices
-        # We sort to ensure deterministic ordering
-        all_node_names = sorted(self.nodes.keys())
+        all_node_names = self.nodes.keys()
         node_to_idx = {name: i for i, name in enumerate(all_node_names)}
         n_nodes = len(all_node_names)
         
         migration_matrices = []
         event_types = []
         admixture_map = {}
+        admixture_map_id = {}
 
         for idx, event in enumerate(self.ordered_events):
             e_type = event['type']
@@ -493,11 +496,15 @@ class DemographicTopology:
                     'child': event['child'],
                     'parents': event['parents']
                 }
+                admixture_map_id[idx] = {
+                    'child': node_to_idx[event['child']],
+                    'parents': [node_to_idx[i] for i in event['parents']]
+                }
                 # Matrix remains Identity
             
             migration_matrices.append(mat)
 
-        return migration_matrices, event_types, admixture_map
+        return migration_matrices, event_types, admixture_map, admixture_map_id
 
     def print_summary(self):
         print(f"\n{'Node':<15} {'Time Range':<15} {'Ne':<8} {'Ancestors (Frac)':<30} {'Descendants'}")
