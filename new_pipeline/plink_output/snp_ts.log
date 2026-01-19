@@ -7,11 +7,11 @@ Options in effect:
   --silent
   --vcf plink_output/snp_ts.vcf
 
-Hostname: QideMac-Studio.local
+Hostname: Mac
 Working directory: /Users/qichen/github/admix_stan/new_pipeline
-Start time: Mon Dec 15 23:36:15 2025
+Start time: Mon Jan 19 11:03:11 2026
 
-Random number seed: 1765841775
+Random number seed: 1768820591
 32768 MB RAM detected; reserving 16384 MB for main workspace.
 --vcf: plink_output/snp_ts-temporary.bed + plink_output/snp_ts-temporary.bim +
 plink_output/snp_ts-temporary.fam written.
@@ -27,4 +27,4 @@ Note: No phenotypes present.
 --make-bed to plink_output/snp_ts.bed + plink_output/snp_ts.bim +
 plink_output/snp_ts.fam ... done.
 
-End time: Mon Dec 15 23:36:15 2025
+End time: Mon Jan 19 11:03:11 2026
