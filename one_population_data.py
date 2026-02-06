@@ -29,7 +29,7 @@ def all_ibd_segments(ts):
             segment_lengths_m[i][j].append((ts.sequence_length-last_left_m[i][j])/ts.sequence_length)
     return segment_lengths_m
 
-def simulate(N,L,m,length,n):
+def simulate(N,L,m,length,n,s):
     demography = msprime.Demography()
     demography.add_population(name="A", initial_size=N[0])
      # bb is the number of bits simulated.
@@ -42,6 +42,7 @@ def simulate(N,L,m,length,n):
         demography=demography, 
         recombination_rate = 1/length,
         sequence_length = bb,
+        random_seed = s
     )
     all = all_ibd_segments(ts)
     out = {'index':[],'fraction':[],'u':[],'v':[],'group':[]}

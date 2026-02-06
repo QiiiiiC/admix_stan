@@ -95,7 +95,7 @@ model {
 
         // This is the sharing number between population B and B
         else if (group[i][1]==2 && group[i][2]==2){
-          lambda = (int_p_L_divide_l(N[3],0,T2,u[i],v[i]) + int_p_L_divide_l(N[4],T2,ancestral_T,u[i], v[i])+int_p_L(ancestral_N,ancestral_T,10000000,u[i], v[i]))*1000;
+          lambda = (int_p_L(N[3],0,T2,u[i],v[i]) + int_p_L(N[4],T2,ancestral_T,u[i], v[i])+int_p_L(ancestral_N,ancestral_T,10000000,u[i], v[i]))*1000;
           target += normal_lpdf(mean_fraction[i] | lambda, boot_var[i]);
         }
       }

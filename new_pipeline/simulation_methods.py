@@ -4,6 +4,8 @@ import numpy as np
 import subprocess
 from pathlib import Path
 from typing import Dict, Optional, List, Tuple
+from collections import defaultdict
+import itertools
 
 def to_msprime_demography(topology):
     """
@@ -244,3 +246,106 @@ def simulate_snp_pruning(
     freq_array = np.array(freq_matrix) 
 
     return final_pruned_indices, freq_array
+
+
+def calculate_ibd_fractions(ts, bins, cm_per_unit=1.0, num_bootstraps=1000):    
+
+    
+    sample_nodes = ts.samples()
+    node_to_pop = ts.nodes_population[sample_nodes]
+    pop_ids = np.unique(node_to_pop)
+    num_pops = len(pop_ids)
+    
+
+    pop_samples = defaultdict(list)
+    for u in sample_nodes:
+        pop_samples[node_to_pop[u]].append(u)
+
+    results = {b_i: defaultdict(lambda: defaultdict(float)) 
+               for b_i in range(len(bins))}
+    
+    genome_length = ts.sequence_length * cm_per_unit
+    
+    # Filter tiny segments
+    min_bin_val = min(b[0] for b in bins)
+    min_span_ts_units = min_bin_val / cm_per_unit
+    
+    ibd_iter = ts.ibd_segments(
+        store_pairs=True, 
+        store_segments=True,
+        min_span=min_span_ts_units  
+    )
+
+    print(f"Iterating IBD segments (min_span={min_span_ts_units:.2f})...")
+    
+    for (u, v), segments in ibd_iter.items(): 
+        p_u = ts.nodes_population[u]
+        p_v = ts.nodes_population[v]
+        p_i, p_j = sorted((p_u, p_v))
+        
+        # Unique identifier for this specific pair of individuals
+        pair_key = tuple(sorted((u, v)))
+        
+        for seg in segments:
+            seg_len = (seg.right - seg.left) * cm_per_unit
+            
+            for b_i, (min_len, max_len) in enumerate(bins):
+                if min_len <= seg_len < max_len:
+                    # FIX 3: Store fraction for the pair using tuple key (p_i, p_j)
+                    # This matches how the bootstrap loop tries to retrieve it later.
+                    results[b_i][(p_i, p_j)][pair_key] += (seg_len / genome_length)
+                    break 
+    
+    final_mean_matrix = {}
+    final_var_matrix = {}
+
+    for b_i in results:
+        mean_matrix = np.zeros((num_pops, num_pops))
+        var_matrix = np.zeros((num_pops, num_pops))
+
+        for i in range(num_pops):
+            for j in range(i, num_pops):
+                # Calculate total theoretical pairs (N)
+                # Now this works because pop_samples[i] is a list
+                if i == j:
+                    n = len(pop_samples[i]) #
+                    num_pairs = n * (n - 1) // 2
+                else:
+                    num_pairs = len(pop_samples[i]) * len(pop_samples[j])
+                
+                if num_pairs == 0:
+                    continue
+
+                # Retrieve observed non-zero fractions
+                # This works now because we stored data with key (i, j)
+                observed_dict = results[b_i].get((i, j), {})
+                observed_values = np.array(list(observed_dict.values()))
+                
+                # The rest are zeros
+                count_zeros = num_pairs - len(observed_values)
+                
+                # Construct the full population of pairs
+                full_population = np.concatenate([
+                    observed_values, 
+                    np.zeros(count_zeros)
+                ])
+
+                # A. Original Mean
+                original_mean = np.mean(full_population)
+                
+                # B. Bootstrap Variance
+                if num_bootstraps > 0:
+                    boot_samples = np.random.choice(full_population, size=(num_bootstraps, num_pairs), replace=True)
+                    boot_means = np.mean(boot_samples, axis=1)
+                    boot_var = np.var(boot_means)
+                else:
+                    boot_var = 0.0
+
+                # Fill Matrices
+                mean_matrix[i, j] = mean_matrix[j, i] = original_mean
+                var_matrix[i, j] = var_matrix[j, i] = boot_var
+
+        final_mean_matrix[b_i] = mean_matrix
+        final_var_matrix[b_i] = var_matrix
+
+    return final_mean_matrix, final_var_matrix
