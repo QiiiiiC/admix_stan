@@ -120,6 +120,7 @@ def simulate_msprime(
         sequence_length=sequence_length,
         recombination_rate=recombination_rate,
         random_seed=seed,
+        model = 'smc'
     )
     
     # Simulate Mutations
@@ -248,7 +249,7 @@ def simulate_snp_pruning(
     return final_pruned_indices, freq_array
 
 
-def calculate_ibd_fractions(ts, bins, cm_per_unit=1.0, num_bootstraps=1000):    
+def calculate_ibd_fractions(ts, bins, cm_per_unit=1e-6, num_bootstraps=1000):    
 
     
     sample_nodes = ts.samples()
@@ -268,7 +269,7 @@ def calculate_ibd_fractions(ts, bins, cm_per_unit=1.0, num_bootstraps=1000):
     
     # Filter tiny segments
     min_bin_val = min(b[0] for b in bins)
-    min_span_ts_units = min_bin_val / cm_per_unit
+    min_span_ts_units = min_bin_val / cm_per_unit-1``
     
     ibd_iter = ts.ibd_segments(
         store_pairs=True, 
