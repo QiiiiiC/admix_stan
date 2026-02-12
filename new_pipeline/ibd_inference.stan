@@ -37,7 +37,7 @@ data {
     // Fixed parameter block
   vector<lower = 0>[n_nodes] effective_N;
   int<lower = 0> n_bins;
-  array[n_bin, 2] real<lower = 0> bin_length;
+  array[n_bins, 2] real<lower = 0> bin_length;
 
     // Observation block
   array[n_bins] matrix<lower = 0>[n_leaves, n_leaves] ibd_hat;
@@ -78,18 +78,27 @@ transformed parameters{
     
 
     for (e in 1:(n_events+1)) {
-        current_location = current_location * parameter_migration_matrices[e];// the i,j entry is the probability of individual drawn from node i ends up in node j between event e and e+1
-        vector[n_nodes] lambda = exp(-times[e]./ (2*effective_N)) * exp(-cumulative_times[e]./ (2* effective_N));
-        matrix[n_nodes, n_nodes] lambda_D = diag_matrix(drift_factors);
-        past_no_coal_probability += quad_form(lambda_D, current_location');
+        if (e > 1){
+            current_location = current_location * parameter_migration_matrices[e];// the i,j entry is the probability of individual drawn from node i ends up in node j between event e and e+1
+            vector[n_nodes] lambda = exp(-times[e-1]./ (2*effective_N)) * exp(-cumulative_times[e-1]./ (2* effective_N));
+            matrix[n_nodes, n_nodes] lambda_D = diag_matrix(lambda);
+            past_no_coal_probability += quad_form(lambda_D, current_location');
+        }
+
         for (b in 1:n_bins){
             if (e == 1){
-                vector[n_nodes] ibd = vc_int_p_L(effective_N, cumulative_times[e-1], cumulative_times[e])
+                vector[n_nodes] ibd = vc_int_p_L(effective_N, 0, cumulative_times[e], bin_length[b,1], bin_length[b,2]);
             }
-            ibd_fraction[b] += ;
+            else if(e == (n_events + 1)){
+                vector[n_nodes] ibd = vc_int_p_L(effective_N, cumulative_times[e-1], 100000000000, bin_length[b,1], bin_length[b,2]);
+            }
+            else{
+                vector[n_nodes] ibd = vc_int_p_L(effective_N, cumulative_times[e-1], cumulative_times[e], bin_length[b,1], bin_length[b,2]);
+            }
+            ibd_fraction[b] += quad_form(diag_matrix(ibd), current_location') .* past_coal_probability;
         }
         
-    }   // Compute the theoretical mean for covariance matrix
+    }   
 
 
     
@@ -101,7 +110,9 @@ model {
 
     for (i in 1:n_leaves) {
         for (j in i:n_leaves) {
-            ibd_hat[i, j] ~ normal(ibd_fraction[i, j], ibd_se[i, j]);
+            for (b in 1:n_bins){
+                ibd_hat[i, j] ~ normal(ibd_fraction[b][i, j], ibd_se[b][i, j]);
+            }
         }
     }
 }
