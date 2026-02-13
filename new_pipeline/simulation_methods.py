@@ -249,7 +249,7 @@ def simulate_snp_pruning(
     return final_pruned_indices, freq_array
 
 
-def calculate_ibd_fractions(ts, bins, cm_per_unit=1e-6, num_bootstraps=1000):    
+def calculate_ibd_fractions_path(ts, bins, cm_per_unit=1e-6, num_bootstraps=1000):    
 
     
     sample_nodes = ts.samples()
@@ -269,7 +269,7 @@ def calculate_ibd_fractions(ts, bins, cm_per_unit=1e-6, num_bootstraps=1000):
     
     # Filter tiny segments
     min_bin_val = min(b[0] for b in bins)
-    min_span_ts_units = min_bin_val / cm_per_unit-1``
+    min_span_ts_units = min_bin_val / cm_per_unit
     
     ibd_iter = ts.ibd_segments(
         store_pairs=True, 
@@ -291,7 +291,7 @@ def calculate_ibd_fractions(ts, bins, cm_per_unit=1e-6, num_bootstraps=1000):
             seg_len = (seg.right - seg.left) * cm_per_unit
             
             for b_i, (min_len, max_len) in enumerate(bins):
-                if min_len <= seg_len < max_len:
+                if min_len < seg_len <= max_len:
                     # FIX 3: Store fraction for the pair using tuple key (p_i, p_j)
                     # This matches how the bootstrap loop tries to retrieve it later.
                     results[b_i][(p_i, p_j)][pair_key] += (seg_len / genome_length)
@@ -319,6 +319,150 @@ def calculate_ibd_fractions(ts, bins, cm_per_unit=1e-6, num_bootstraps=1000):
 
                 # Retrieve observed non-zero fractions
                 # This works now because we stored data with key (i, j)
+                observed_dict = results[b_i].get((i, j), {})
+                observed_values = np.array(list(observed_dict.values()))
+                
+                # The rest are zeros
+                count_zeros = num_pairs - len(observed_values)
+                
+                # Construct the full population of pairs
+                full_population = np.concatenate([
+                    observed_values, 
+                    np.zeros(count_zeros)
+                ])
+
+                # A. Original Mean
+                original_mean = np.mean(full_population)
+                
+                # B. Bootstrap Variance
+                if num_bootstraps > 0:
+                    boot_samples = np.random.choice(full_population, size=(num_bootstraps, num_pairs), replace=True)
+                    boot_means = np.mean(boot_samples, axis=1)
+                    boot_var = np.var(boot_means)
+                else:
+                    boot_var = 0.0
+
+                # Fill Matrices
+                mean_matrix[i, j] = mean_matrix[j, i] = original_mean
+                var_matrix[i, j] = var_matrix[j, i] = boot_var
+
+        final_mean_matrix[b_i] = mean_matrix
+        final_var_matrix[b_i] = var_matrix
+
+    return final_mean_matrix, final_var_matrix
+
+
+def calculate_ibd_fractions_mrca(ts, bins, cm_per_unit=1e-6, num_bootstraps=1000):
+    """
+    Calculates IBD fractions using the strict 'MRCA-span' definition.
+    Segments are defined by continuous TMRCA, ignoring changes in topology 
+    that do not alter the most recent common ancestor.
+    """
+    
+    # 1. Setup Population Mappings
+    sample_nodes = ts.samples()
+    num_samples = len(sample_nodes)
+    node_to_pop = ts.nodes_population[sample_nodes]
+    pop_ids = np.unique(node_to_pop)
+    num_pops = len(pop_ids)
+
+    pop_samples = defaultdict(list)
+    for u in sample_nodes:
+        pop_samples[node_to_pop[u]].append(u)
+
+    # 2. Initialize Results Container
+    # structure: results[bin_index][(pop_i, pop_j)][pair_key] = total_fraction
+    results = {b_i: defaultdict(lambda: defaultdict(float)) 
+               for b_i in range(len(bins))}
+    
+    genome_length_cm = ts.sequence_length * cm_per_unit
+
+    # 3. Iterate Trees to Extract MRCA-span Segments
+    # We maintain the state of the current segment for every pair of samples.
+    # state[(u, v)] = (current_mrca_node, start_coordinate_bp)
+    current_state = {}
+    
+    # Initialize with the first tree
+    tree_iter = ts.trees()
+    first_tree = next(tree_iter)
+    
+    # Pre-calculate pairs to iterate (u, v)
+    # Using indices to access the sample_nodes array is faster
+    pairs = []
+    for i in range(num_samples):
+        for j in range(i + 1, num_samples):
+            u, v = sample_nodes[i], sample_nodes[j]
+            pairs.append((u, v))
+            
+            # Initialize state
+            mrca = first_tree.mrca(u, v)
+            current_state[(u, v)] = (mrca, first_tree.interval.left)
+
+    print(f"Scanning trees for MRCA segments ({len(pairs)} pairs)...")
+
+    # Helper to process a finished segment
+    def process_segment(u, v, length_bp):
+        length_cm = length_bp * cm_per_unit
+        
+        # Binning logic
+        for b_i, (min_len, max_len) in enumerate(bins):
+            # Note: Strict inequality matching your request (min < len <= max)
+            # Adjust if you need inclusive lower bound
+            if min_len < length_cm <= max_len:
+                p_u = node_to_pop[u]
+                p_v = node_to_pop[v]
+                p_i, p_j = sorted((p_u, p_v))
+                pair_key = tuple(sorted((u, v)))
+                
+                results[b_i][(p_i, p_j)][pair_key] += (length_cm / genome_length_cm)
+                break
+
+    # Iterate through the rest of the trees
+    for tree in tree_iter:
+        current_left = tree.interval.left
+        
+        for (u, v) in pairs:
+            new_mrca = tree.mrca(u, v)
+            old_mrca, start_pos = current_state[(u, v)]
+            
+            # MRCA changed? Segment ended.
+            if new_mrca != old_mrca:
+                seg_len = current_left - start_pos
+                process_segment(u, v, seg_len)
+                
+                # Start new segment
+                current_state[(u, v)] = (new_mrca, current_left)
+
+    # 4. Flush the final segments (end of genome)
+    final_pos = ts.sequence_length
+    for (u, v) in pairs:
+        old_mrca, start_pos = current_state[(u, v)]
+        seg_len = final_pos - start_pos
+        process_segment(u, v, seg_len)
+
+    # 5. Matrix Construction & Bootstrapping (Same as your original code)
+    final_mean_matrix = {}
+    final_var_matrix = {}
+
+    for b_i in results:
+        mean_matrix = np.zeros((num_pops, num_pops))
+        var_matrix = np.zeros((num_pops, num_pops))
+
+        for i in range(num_pops):
+            for j in range(i, num_pops):
+                # Calculate total theoretical pairs
+                n_i = len(pop_samples[i])
+                n_j = len(pop_samples[j])
+                
+                if i == j:
+                    num_pairs = n_i * (n_i - 1) // 2
+                else:
+                    num_pairs = n_i * n_j
+                
+                if num_pairs == 0:
+                    continue
+
+                # Retrieve observed non-zero fractions
                 observed_dict = results[b_i].get((i, j), {})
                 observed_values = np.array(list(observed_dict.values()))
                 
