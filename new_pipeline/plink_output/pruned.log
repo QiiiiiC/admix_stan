@@ -8,22 +8,22 @@ Options in effect:
 
 Hostname: Mac
 Working directory: /Users/qichen/github/admix_stan/new_pipeline
-Start time: Mon Jan 19 11:03:11 2026
+Start time: Tue Feb 17 20:27:04 2026
 
-Random number seed: 1768820591
+Random number seed: 1771360024
 32768 MB RAM detected; reserving 16384 MB for main workspace.
-46464 variants loaded from .bim file.
+173223 variants loaded from .bim file.
 80 people (0 males, 0 females, 80 ambiguous) loaded from .fam.
 Ambiguous sex IDs written to plink_output/pruned.nosex .
 Using 1 thread (no multithreaded calculations invoked).
 Before main variant filters, 80 founders and 0 nonfounders present.
 Calculating allele frequencies... done.
 Total genotyping rate is exactly 1.
-46464 variants and 80 people pass filters and QC.
+173223 variants and 80 people pass filters and QC.
 Note: No phenotypes present.
-Pruned 40553 variants from chromosome 1, leaving 5911.
-Pruning complete.  40553 of 46464 variants removed.
+Pruned 150365 variants from chromosome 1, leaving 22858.
+Pruning complete.  150365 of 173223 variants removed.
 Marker lists written to plink_output/pruned.prune.in and
 plink_output/pruned.prune.out .
 
-End time: Mon Jan 19 11:03:12 2026
+End time: Tue Feb 17 20:27:04 2026

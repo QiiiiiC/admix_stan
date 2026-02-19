@@ -45,8 +45,8 @@ data {
 }
 
 parameters{
-    // vector<lower = 0>[n_nodes] effective_N;   // effective population sizes, assume constant for each nodes
-    vector<lower = 0>[n_events] times;          // times between each events
+    //vector<lower = 0>[n_nodes] effective_N;   // effective population sizes, assume constant for each nodes
+    vector<lower = 0>[n_events] times;          // times between each epoch, the first time is between 0 and the first event.
     array[n_admixture] real<lower = 0, upper = 1> admixture_fractions; // admixture fractions for each admixture event(default to the first population)
 }
 
