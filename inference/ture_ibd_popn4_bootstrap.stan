@@ -61,41 +61,42 @@ model {
     fraction ~ uniform(0,1);
 
     for (i in 1:N_obs) {
-      if (u[i]>0.7 && boot_var[i]>0){
+      if (boot_var[i]>0){
 
       
         // The sharing between any population and the outergroup is ignored as there's no parameter involved.
       // This is the sharing between population A and A
         real lambda;
         if (group[i][1]==0 && group[i][2]==0){
-          lambda = (int_p_L(N[1],0,T2,u[i],v[i]) + int_p_L(N[4],T2,ancestral_T,u[i],v[i]) + int_p_L(ancestral_N,ancestral_T,10000000,u[i], v[i])) * 1000;
+          lambda = (int_p_L(N[1],0,T2,u[i],v[i]) + exp(-T2/N[1]) * int_p_L(N[4],T2,ancestral_T,u[i],v[i]) + exp(-(ancestral_T-T2)/N[4] - T2/N[1]) * int_p_L(ancestral_N,ancestral_T,10000000,u[i], v[i])) * 1000;
           target += normal_lpdf(mean_fraction[i] | lambda, boot_var[i]);
         }
         // This is the sharing between population A and Admix
         else if (group[i][1]==0 && group[i][2]==1){
-          lambda = (fraction*int_p_L_divide_l(N[1],T1,ancestral_T,u[i],v[i]) + int_p_L(ancestral_N,ancestral_T,10000000,u[i], v[i]))*1000;
+          lambda = (fraction*int_p_L_divide_l(N[1],T1,T2,u[i],v[i]) + fraction * exp(-(T2 - T1)/N[1]) * int_p_L(N[4],T2,ancestral_T,u[i],v[i]) +  fraction * exp(-(T2 - T1)/N[1]) * exp( -(ancestral_T - T2)/N[4]) * int_p_L(ancestral_N,ancestral_T,10000000,u[i], v[i]))*1000;
           target += normal_lpdf(mean_fraction[i] | lambda, boot_var[i]);
         }
         // This is the sharing between population A and B
         else if (group[i][1]==0 && group[i][2]==2){
-          lambda = (int_p_L(N[4],T2, ancestral_T,u[i], v[i]) + int_p_L(ancestral_N, ancestral_T, 10000000, u[i], v[i]))*1000;
+          lambda = (int_p_L(N[4],T2, ancestral_T,u[i], v[i]) + exp(-(ancestral_T - T2)/N[4]) * int_p_L(ancestral_N, ancestral_T, 10000000, u[i], v[i]))*1000;
           target += normal_lpdf(mean_fraction[i] | lambda, boot_var[i]);
         }
 
         // This is the sharing between population Admix and Admix
         else if (group[i][1]==1 && group[i][2]==1){
-          lambda = (int_p_L(N[2],0,T1,u[i],v[i]) + pow(fraction,2) * int_p_L(N[1],T1,ancestral_T,u[i],v[i]) + pow(1-fraction,2)*(int_p_L(N[3],T1,T2,u[i],v[i])+int_p_L(N[4],T2,ancestral_T,u[i],v[i])) + int_p_L(ancestral_N,ancestral_T,100000000,u[i], v[i]))*1000;
+          lambda = (int_p_L(N[2],0,T1,u[i],v[i]) + pow(fraction,2) * exp(-T1/N[2]) * int_p_L(N[1],T1,ancestral_T,u[i],v[i]) + pow(1-fraction,2)* exp(-T1/N[2]) * (int_p_L(N[3],T1,T2,u[i],v[i])+ 
+          (pow(fraction,2) * exp(-(T2-T1)/N[1]) + pow(1-fraction,2) * exp(-(T2 - T1)/N[3])) * exp(-T1/N[2]) * int_p_L(N[4],T2,ancestral_T,u[i],v[i])) + exp(-(ancestral_T - T2)/N[4])*(pow(fraction,2) * exp(-(T2-T1)/N[1]) + pow(1-fraction,2) * exp(-(T2 - T1)/N[3])) * exp(-T1/N[2]) * int_p_L(ancestral_N,ancestral_T,100000000,u[i], v[i]))*1000;
           target += normal_lpdf(mean_fraction[i] | lambda, boot_var[i]);
         }
         // This is the sharing number between population Admix and B
         else if (group[i][1]==1 && group[i][2]==2){
-          lambda = ((1-fraction) * (int_p_L(N[3],T1,T2,u[i],v[i]) + int_p_L(N[4],T2,ancestral_T,u[i],v[i])) + int_p_L(ancestral_N,ancestral_T,100000000,u[i], v[i]))*1000;
+          lambda = ((1-fraction) * (int_p_L(N[3],T1,T2,u[i],v[i]) + (1-fraction) * exp( -(T2 - T2)/N[3]) * int_p_L(N[4],T2,ancestral_T,u[i],v[i])) + (1-fraction) * exp( -(ancestral_T - T2)/N[4] - (T2 - T1)/N[3]) * int_p_L(ancestral_N,ancestral_T,100000000,u[i], v[i]))*1000;
           target += normal_lpdf(mean_fraction[i] | lambda, boot_var[i]);
         }
 
         // This is the sharing number between population B and B
         else if (group[i][1]==2 && group[i][2]==2){
-          lambda = (int_p_L(N[3],0,T2,u[i],v[i]) + int_p_L(N[4],T2,ancestral_T,u[i], v[i])+int_p_L(ancestral_N,ancestral_T,10000000,u[i], v[i]))*1000;
+          lambda = (int_p_L(N[3],0,T2,u[i],v[i]) + exp(-T2/N[3]) * int_p_L(N[4],T2,ancestral_T,u[i], v[i])+ exp(-(ancestral_T-T2)/N[4] - T2/N[1]) * int_p_L(ancestral_N,ancestral_T,10000000,u[i], v[i]))*1000;
           target += normal_lpdf(mean_fraction[i] | lambda, boot_var[i]);
         }
       }

@@ -83,7 +83,8 @@ def sim_ibd_admix(N,T,L,m,length,n,alpha,seed):
         demography=demography, 
         recombination_rate = 1/length,
         sequence_length = bb,
-        random_seed = seed
+        random_seed = seed,
+        model = 'smc'
     )
     all = all_ibd_segments(ts)
     out = {'index':[],'number':[],'fraction':[],'u':[],'v':[],'group':[],'true_N':[],'true_T1':[],'true_T2':[],'true_T3':[]}

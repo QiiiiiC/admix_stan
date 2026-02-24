@@ -494,3 +494,136 @@ def calculate_ibd_fractions_mrca(ts, bins, cm_per_unit=1e-6, num_bootstraps=1000
         final_var_matrix[b_i] = var_matrix
 
     return final_mean_matrix, final_var_matrix
+
+def build_ibd_stan_data(
+    dem,
+    ibd_mean: dict,
+    ibd_var: dict,
+    bins: list,
+    T_max: float = None,
+    se_floor: float = 1e-8,
+    effective_N: list = None
+) -> dict:
+    """
+    Build a Stan data dictionary for the IBD model directly from a
+    DemographicTopology object (dem) and IBD summary statistics.
+
+    Parameters
+    ----------
+    dem : DemographicTopology
+        Topology of populations.
+
+    ibd_mean : dict
+        {bin_index: np.ndarray (n_leaves, n_leaves)} — mean IBD fractions
+        per population pair per bin.  
+
+    ibd_var : dict
+        {bin_index: np.ndarray (n_leaves, n_leaves)} — bootstrap *variances*
+        (not SDs). Will convert to sd internally.
+
+    bins : list of [min_cM, max_cM]
+        Bin boundaries in centiMorgans, e.g. [[0.5,0.6],[0.6,0.7],...].
+        Must match the order used when computing ibd_mean/ibd_var.
+
+    T_max : float, optional
+        Upper bound for the final open-ended epoch (generations).
+        Defaults to 100 * max(effective_N) if not supplied.
+
+    se_floor : float
+        Minimum SE to avoid zero-variance likelihoods crashing the sampler.
+        Pairs with zero IBD (e.g. isolated populations in short-segment bins)
+        will otherwise produce an infinitely tight normal constraint on 0.
+
+    Returns
+    -------
+    ibd_data : dict
+        Ready to pass directly to cmdstanpy model.sample(data=ibd_data).
+    """
+    ibd_data = {}
+
+    # ------------------------------------------------------------------
+    # 1. Topology block — identical logic to snp_data
+    # ------------------------------------------------------------------
+    matrices, events, admixture_map, admixture_map_id = \
+        dem.get_topology_matrix_representation()
+
+    ibd_data['n_leaves']    = len(dem.initial_leaves)
+    ibd_data['n_nodes']     = len(dem.nodes)
+    ibd_data['n_events']    = len(dem.ordered_events)
+    ibd_data['n_admixture'] = dem.n_admix
+    ibd_data['migration_matrices'] = matrices
+
+    # admixture_map: [event_index, src, tgt1, tgt2]  (0-based internally)
+    m = []
+    for i in admixture_map_id.keys():
+        m.append(
+            [i, admixture_map_id[i]['child']] +
+            admixture_map_id[i]['parents']
+        )
+    ibd_data['admixture_map'] = m
+
+    # Index arrays: 1-based to match Stan
+    ibd_data['admixture_indices']     = [i + 2 for i in admixture_map_id.keys()]
+    ibd_data['fixed_indices_shifted'] = [
+        i for i in range(2, ibd_data['n_events'] + 2)
+        if i not in ibd_data['admixture_indices']
+    ]
+    ibd_data['fixed_indices'] = [i - 1 for i in ibd_data['fixed_indices_shifted']]
+
+    # ------------------------------------------------------------------
+    # 2. effective_N for each leaf population
+    # ------------------------------------------------------------------
+    ibd_data['effective_N'] = effective_N.tolist()
+
+    # ------------------------------------------------------------------
+    # 3. T_max
+    # ------------------------------------------------------------------
+    if T_max is None:
+        T_max = float(100 * np.max(effective_N))
+        print(f"[build_ibd_stan_data] T_max not provided — using 100 * max(N) = {T_max:.0f} generations")
+    ibd_data['T_max'] = T_max
+
+    # ------------------------------------------------------------------
+    # 4. Bin boundaries
+    # ------------------------------------------------------------------
+    n_bins = len(bins)
+    ibd_data['n_bins']      = n_bins
+    ibd_data['bin_length']  = [list(b) for b in bins]   # (n_bins, 2)
+
+    # ------------------------------------------------------------------
+    # 5. IBD observations: ibd_hat and ibd_se
+    #    ibd_var (bootstrap variance) → SE = sqrt(var), with a floor
+    # ------------------------------------------------------------------
+    n_leaves = ibd_data['n_leaves']
+
+    assert len(ibd_mean) == n_bins, \
+        f"ibd_mean has {len(ibd_mean)} entries but bins has {n_bins}"
+    assert ibd_mean[0].shape == (n_leaves, n_leaves), \
+        f"Expected ibd_mean matrices of shape ({n_leaves},{n_leaves}), " \
+        f"got {ibd_mean[0].shape}. Check that populations match dem.initial_leaves."
+
+    ibd_hat = np.zeros((n_bins, n_leaves, n_leaves))
+    ibd_se  = np.zeros((n_bins, n_leaves, n_leaves))
+
+    for b in range(n_bins):
+        ibd_hat[b] = ibd_mean[b]
+        se = np.sqrt(np.maximum(ibd_var[b], 0.0))  # guard tiny floating negatives
+        ibd_se[b]  = np.maximum(se, se_floor)       # floor for zero-IBD pairs
+
+    ibd_data['ibd_hat'] = ibd_hat.tolist()
+    ibd_data['ibd_se']  = ibd_se.tolist()
+
+    # ------------------------------------------------------------------
+    # 6. Summary
+    # ------------------------------------------------------------------
+    print(f"[build_ibd_stan_data] Stan data assembled:")
+    print(f"  n_leaves    : {ibd_data['n_leaves']}")
+    print(f"  n_nodes     : {ibd_data['n_nodes']}")
+    print(f"  n_events    : {ibd_data['n_events']}")
+    print(f"  n_admixture : {ibd_data['n_admixture']}")
+    print(f"  n_bins      : {n_bins}")
+    print(f"  T_max       : {T_max:.0f} generations")
+    print(f"  ibd_hat     : [{ibd_hat.min():.3e}, {ibd_hat.max():.3e}]")
+    print(f"  ibd_se      : [{ibd_se.min():.3e},  {ibd_se.max():.3e}]")
+
+    return ibd_data

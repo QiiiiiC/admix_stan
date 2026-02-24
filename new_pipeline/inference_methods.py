@@ -82,4 +82,3 @@ def calculate_treemix_covariance(allele_freq_matrix, block_size_snps=500, min_ma
     return W_mean, W_se
 
 
-def ibd2stan()
