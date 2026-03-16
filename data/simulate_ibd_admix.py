@@ -5,9 +5,9 @@ from methods import sim_ibd_admix
 import json 
 
 seed = 42
-length = 1e7
+length = 1e6
 n= 20
-m = 3
+m = 0.3
 N = [5000,5000,5000,5000,5000,5000]
 L = [0.5,0.6,0.7,0.8,0.9,1,1.5,2,10,300]
 T = [50,500,1000]

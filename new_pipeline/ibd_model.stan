@@ -34,7 +34,7 @@ data {
     array[n_events - n_admixture] int<lower=1, upper=n_events+1> fixed_indices_shifted;
 
     // Fixed parameter block
-    vector<lower=0>[n_nodes] effective_N;
+
     int<lower=0> n_bins;
     array[n_bins, 2] real<lower=0> bin_length;
     real<lower=0> T_max;
@@ -52,6 +52,7 @@ data {
 parameters {
     vector<lower=1>[n_events] times;
     array[n_admixture] real<lower=0, upper=1> admixture_fractions;
+    vector<lower=1000>[n_nodes] effective_N;
 }
 
 transformed parameters {
@@ -184,6 +185,7 @@ transformed parameters {
 model {
     times ~ exponential(0.001);
     admixture_fractions ~ uniform(0, 1);
+    effective_N ~ lognormal(log(10000), 1);
 
     for (i in 1:n_leaves) {
         for (j in i:n_leaves) {
@@ -195,4 +197,3 @@ model {
         }
     }
 }
-

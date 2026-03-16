@@ -6,24 +6,24 @@ Options in effect:
   --out plink_output/pruned
   --silent
 
-Hostname: Mac
+Hostname: QideMac-Studio.local
 Working directory: /Users/qichen/github/admix_stan/new_pipeline
-Start time: Mon Feb 23 23:31:09 2026
+Start time: Mon Mar 16 11:31:46 2026
 
-Random number seed: 1771889469
+Random number seed: 1773660706
 32768 MB RAM detected; reserving 16384 MB for main workspace.
-188416 variants loaded from .bim file.
-80 people (0 males, 0 females, 80 ambiguous) loaded from .fam.
+16267 variants loaded from .bim file.
+100 people (0 males, 0 females, 100 ambiguous) loaded from .fam.
 Ambiguous sex IDs written to plink_output/pruned.nosex .
 Using 1 thread (no multithreaded calculations invoked).
-Before main variant filters, 80 founders and 0 nonfounders present.
+Before main variant filters, 100 founders and 0 nonfounders present.
 Calculating allele frequencies... done.
 Total genotyping rate is exactly 1.
-188416 variants and 80 people pass filters and QC.
+16267 variants and 100 people pass filters and QC.
 Note: No phenotypes present.
-Pruned 165577 variants from chromosome 1, leaving 22839.
-Pruning complete.  165577 of 188416 variants removed.
+Pruned 14209 variants from chromosome 1, leaving 2058.
+Pruning complete.  14209 of 16267 variants removed.
 Marker lists written to plink_output/pruned.prune.in and
 plink_output/pruned.prune.out .
 
-End time: Mon Feb 23 23:31:10 2026
+End time: Mon Mar 16 11:31:46 2026
