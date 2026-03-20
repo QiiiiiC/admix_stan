@@ -503,7 +503,7 @@ def build_ibd_stan_data(
     bins: list,
     T_max: float = None,
     se_floor: float = 1e-8,
-    effective_N: list = None
+    cm: float = None
 ) -> dict:
     """
     Build a Stan data dictionary for the CORRECTED IBD model that tracks
@@ -533,9 +533,6 @@ def build_ibd_stan_data(
 
     se_floor : float
         Minimum SE to avoid zero-variance likelihoods.
-
-    effective_N : array-like
-        Effective population sizes for each node.
 
     Returns
     -------
@@ -578,27 +575,19 @@ def build_ibd_stan_data(
     ibd_data['fixed_indices'] = [i - 1 for i in ibd_data['fixed_indices_shifted']]
 
     # ------------------------------------------------------------------
-    # 2. effective_N
+    # 2. T_max
     # ------------------------------------------------------------------
-    ibd_data['effective_N'] = effective_N.tolist()
-
-    # ------------------------------------------------------------------
-    # 3. T_max
-    # ------------------------------------------------------------------
-    if T_max is None:
-        T_max = float(100 * np.max(effective_N))
-        print(f"[build_ibd_stan_data] T_max not provided — using 100 * max(N) = {T_max:.0f} generations")
     ibd_data['T_max'] = T_max
 
     # ------------------------------------------------------------------
-    # 4. Bin boundaries
+    # 3. Bin boundaries
     # ------------------------------------------------------------------
     n_bins = len(bins)
     ibd_data['n_bins']      = n_bins
     ibd_data['bin_length']  = [list(b) for b in bins]
 
     # ------------------------------------------------------------------
-    # 5. NEW: Precompute leaf pair indices for the corrected model
+    # 4.: Precompute leaf pair indices for the corrected model
     #    We enumerate all unique pairs (i, j) with i <= j (1-based).
     #    This includes self-pairs (i, i) for diagonal IBD entries.
     # ------------------------------------------------------------------
@@ -617,7 +606,7 @@ def build_ibd_stan_data(
     ibd_data['pair_j'] = pair_j_list
 
     # ------------------------------------------------------------------
-    # 6. IBD observations: ibd_hat and ibd_se
+    # 5. IBD observations: ibd_hat and ibd_se
     # ------------------------------------------------------------------
     assert len(ibd_mean) == n_bins, \
         f"ibd_mean has {len(ibd_mean)} entries but bins has {n_bins}"
@@ -635,6 +624,11 @@ def build_ibd_stan_data(
 
     ibd_data['ibd_hat'] = ibd_hat.tolist()
     ibd_data['ibd_se']  = ibd_se.tolist()
+
+    # ------------------------------------------------------------------
+    # 6. cM simulated
+    # ------------------------------------------------------------------    
+    ibd_data['cm'] = cm
 
     # ------------------------------------------------------------------
     # 7. Summary

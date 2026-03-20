@@ -1,21 +1,48 @@
 functions {
     real int_p_L(real N, real t1, real t2, real u, real v) {
+        if (t2 - t1 < 1e-10) return 0.0;  // zero-length epoch
+
         real cu = -(1.0/N + u/50.0);
         real cv = -(1.0/N + v/50.0);
         
-        real eu1 = exp(t1/N + cu*t1);  
-        real eu2 = exp(t1/N + cu*t2);  
-        real ev1 = exp(t1/N + cv*t1);  
-        real ev2 = exp(t1/N + cv*t2);  
+        real eu1 = exp(-u * t1 / 50.0);
+        real eu2 = exp((t1 - t2) / N - u * t2 / 50.0);
+        real ev1 = exp(-v * t1 / 50.0);
+        real ev2 = exp((t1 - t2) / N - v * t2 / 50.0); 
+
+        if (eu2 < 1e-300 && ev2 < 1e-300) return 0.0;
         
-        real k1 = u/(50.0*N) * (eu2*(cu*t2 - 1.0)/pow(cu, 2)
-                               - eu1*(cu*t1 - 1.0)/pow(cu, 2));
-        real k2 = v/(50.0*N) * (ev2*(cv*t2 - 1.0)/pow(cv, 2)
-                               - ev1*(cv*t1 - 1.0)/pow(cv, 2));
+        real k1 = u/(50.0*N) * (eu2*(cu*t2 - 1.0)/pow(cu, 2) - eu1*(cu*t1 - 1.0)/pow(cu, 2));
+        real k2 = v/(50.0*N) * (ev2*(cv*t2 - 1.0)/pow(cv, 2) - ev1*(cv*t1 - 1.0)/pow(cv, 2));
         real k3 = 1.0/N * (eu2/cu - eu1/cu);
         real k4 = 1.0/N * (ev2/cv - ev1/cv);
+
+        real result = k1 - k2 + k3 - k4;
+        if (is_nan(result) || is_inf(result)) return 0.0;
+
         
-        return k1 - k2 + k3 - k4;
+        return result;
+    }
+
+    real int_p_LL(real N, real t1, real t2, real u, real v){
+        if (t2 - t1 < 1e-10) return 0.0;  // zero-length epoch
+
+        real cu = -(1.0/N + u/50.0);
+        real cv = -(1.0/N + v/50.0);
+        
+        real eu1 = exp(-u * t1 / 50.0);
+        real eu2 = exp((t1 - t2) / N - u * t2 / 50.0);
+        real ev1 = exp(-v * t1 / 50.0);
+        real ev2 = exp((t1 - t2) / N - v * t2 / 50.0); 
+
+        if (eu2 < 1e-300 && ev2 < 1e-300) return 0.0;
+        
+        real k1 = 1/(50.0*N) * (eu2*(cu*t2 - 1.0)/pow(cu, 2) - eu1*(cu*t1 - 1.0)/pow(cu, 2));
+        real k2 = 1/(50.0*N) * (ev2*(cv*t2 - 1.0)/pow(cv, 2) - ev1*(cv*t1 - 1.0)/pow(cv, 2));
+
+        real result = k1 - k2;
+        if (is_nan(result) || is_inf(result)) return 0.0;
+        return result;
     }
 }
 
@@ -34,10 +61,10 @@ data {
     array[n_events - n_admixture] int<lower=1, upper=n_events+1> fixed_indices_shifted;
 
     // Fixed parameter block
-    vector<lower=0>[n_nodes] effective_N;
     int<lower=0> n_bins;
     array[n_bins, 2] real<lower=0> bin_length;
     real<lower=0> T_max;
+    real<lower=0> cm;
 
     // Precomputed leaf pair indices (1-based, pair_i[p] <= pair_j[p])
     int<lower=0> n_leaf_pairs;
@@ -52,6 +79,7 @@ data {
 parameters {
     vector<lower=1>[n_events] times;
     array[n_admixture] real<lower=0, upper=1> admixture_fractions;
+    real<lower=1> effective_N;
 }
 
 transformed parameters {
@@ -118,8 +146,10 @@ transformed parameters {
     // ================================================================
 
     array[n_bins] matrix[n_leaves, n_leaves] ibd_fraction;
+    array[n_bins] matrix[n_leaves, n_leaves] ibd_number;
     for (b in 1:n_bins) {
         ibd_fraction[b] = rep_matrix(0.0, n_leaves, n_leaves);
+        ibd_number[b] = rep_matrix(0.0, n_leaves, n_leaves);
     }
 
     for (p in 1:n_leaf_pairs) {
@@ -162,12 +192,14 @@ transformed parameters {
                     // int_p_L gives the conditional IBD integral for this epoch.
                     for (b in 1:n_bins) {
                         ibd_fraction[b][li, lj] += w_diag *
-                            int_p_L(effective_N[a], t_start, t_end,
+                            int_p_L(effective_N, t_start, t_end,
+                                    bin_length[b, 1], bin_length[b, 2]);
+                        ibd_number[b][li, lj] += w_diag * int_p_LL(effective_N, t_start, t_end,
                                     bin_length[b, 1], bin_length[b, 2]);
                     }
 
                     // Survival: no coalescence in this epoch
-                    W[a, a] = w_diag * exp(-duration / effective_N[a]);
+                    W[a, a] = w_diag * exp(-duration / effective_N);
                 }
             }
         }
@@ -176,21 +208,27 @@ transformed parameters {
         if (li != lj) {
             for (b in 1:n_bins) {
                 ibd_fraction[b][lj, li] = ibd_fraction[b][li, lj];
+                ibd_number[b][lj, li] = ibd_number[b][li, lj];
             }
         }
     }
 }
 
 model {
-    times ~ exponential(0.001);
+    times ~ exponential(0.01);
     admixture_fractions ~ uniform(0, 1);
+    effective_N ~ normal(10000, 3000) T[1000, 20000];
 
     for (i in 1:n_leaves) {
         for (j in i:n_leaves) {
             for (b in 1:n_bins) {
-                if (ibd_hat[b][i, j] > 0.0 && !is_nan(ibd_fraction[b][i, j]) && !is_inf(ibd_fraction[b][i, j])) {
-                    ibd_hat[b][i, j] ~ normal(ibd_fraction[b][i, j], ibd_se[b][i, j]);
-                }
+
+                    if(ibd_hat[b][i, j] >0){ 
+                        target += normal_lpdf(ibd_hat[b][i,j] |ibd_fraction[b][i, j], ibd_se[b][i, j]);
+                    } else {
+                        target += -ibd_number[b][i,j] * cm;
+                    }
+                
             }
         }
     }

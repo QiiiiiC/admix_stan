@@ -9,22 +9,22 @@ Options in effect:
 
 Hostname: QideMac-Studio.local
 Working directory: /Users/qichen/github/admix_stan/new_pipeline
-Start time: Mon Mar 16 11:31:46 2026
+Start time: Thu Mar 19 19:31:09 2026
 
-Random number seed: 1773660706
+Random number seed: 1773948669
 32768 MB RAM detected; reserving 16384 MB for main workspace.
 --vcf: plink_output/snp_ts-temporary.bed + plink_output/snp_ts-temporary.bim +
 plink_output/snp_ts-temporary.fam written.
-16267 variants loaded from .bim file.
+13286 variants loaded from .bim file.
 100 people (0 males, 0 females, 100 ambiguous) loaded from .fam.
 Ambiguous sex IDs written to plink_output/snp_ts.nosex .
 Using 1 thread (no multithreaded calculations invoked).
 Before main variant filters, 100 founders and 0 nonfounders present.
 Calculating allele frequencies... done.
 Total genotyping rate is exactly 1.
-16267 variants and 100 people pass filters and QC.
+13286 variants and 100 people pass filters and QC.
 Note: No phenotypes present.
 --make-bed to plink_output/snp_ts.bed + plink_output/snp_ts.bim +
 plink_output/snp_ts.fam ... done.
 
-End time: Mon Mar 16 11:31:46 2026
+End time: Thu Mar 19 19:31:09 2026
