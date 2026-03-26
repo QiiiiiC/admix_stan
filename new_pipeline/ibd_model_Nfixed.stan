@@ -5,23 +5,22 @@ functions {
         real cu = -(1.0/N + u/50.0);
         real cv = -(1.0/N + v/50.0);
         
+        // Push exp(t1/N) inside the calculation to avoid Inf * 0 = NaN
         real eu1 = exp(-u * t1 / 50.0);
         real eu2 = exp((t1 - t2) / N - u * t2 / 50.0);
         real ev1 = exp(-v * t1 / 50.0);
-        real ev2 = exp((t1 - t2) / N - v * t2 / 50.0); 
-
-        if (eu2 < 1e-300 && ev2 < 1e-300) return 0.0;
+        real ev2 = exp((t1 - t2) / N - v * t2 / 50.0);
         
-        real k1 = u/(50.0*N) * (eu2*(cu*t2 - 1.0)/pow(cu, 2) - eu1*(cu*t1 - 1.0)/pow(cu, 2));
-        real k2 = v/(50.0*N) * (ev2*(cv*t2 - 1.0)/pow(cv, 2) - ev1*(cv*t1 - 1.0)/pow(cv, 2));
+        real cu2 = cu * cu;
+        real cv2 = cv * cv;
+
+        real k1 = u/(50.0*N) * (eu2 * (cu*t2 - 1.0)/cu2 - eu1 * (cu*t1 - 1.0)/cu2);
+        real k2 = v/(50.0*N) * (ev2 * (cv*t2 - 1.0)/cv2 - ev1 * (cv*t1 - 1.0)/cv2);
+        
         real k3 = 1.0/N * (eu2/cu - eu1/cu);
         real k4 = 1.0/N * (ev2/cv - ev1/cv);
 
-        real result = k1 - k2 + k3 - k4;
-        if (is_nan(result) || is_inf(result)) return 0.0;
-
-        
-        return result;
+        return k1 - k2 + k3 - k4;
     }
 
     real int_p_LL(real N, real t1, real t2, real u, real v){
@@ -35,13 +34,11 @@ functions {
         real ev1 = exp(-v * t1 / 50.0);
         real ev2 = exp((t1 - t2) / N - v * t2 / 50.0); 
 
-        if (eu2 < 1e-300 && ev2 < 1e-300) return 0.0;
         
-        real k1 = 1/(50.0*N) * (eu2*(cu*t2 - 1.0)/pow(cu, 2) - eu1*(cu*t1 - 1.0)/pow(cu, 2));
-        real k2 = 1/(50.0*N) * (ev2*(cv*t2 - 1.0)/pow(cv, 2) - ev1*(cv*t1 - 1.0)/pow(cv, 2));
+        real k1 = 1.0/(50.0*N) * (eu2*(cu*t2 - 1.0)/pow(cu, 2) - eu1*(cu*t1 - 1.0)/pow(cu, 2));
+        real k2 = 1.0/(50.0*N) * (ev2*(cv*t2 - 1.0)/pow(cv, 2) - ev1*(cv*t1 - 1.0)/pow(cv, 2));
 
         real result = k1 - k2;
-        if (is_nan(result) || is_inf(result)) return 0.0;
         return result;
     }
 }
@@ -226,7 +223,11 @@ model {
                     if(ibd_hat[b][i, j] >0){ 
                         target += normal_lpdf(ibd_hat[b][i,j] |ibd_fraction[b][i, j], ibd_se[b][i, j]);
                     } else {
-                        target += -ibd_number[b][i,j] * cm;
+                        if(i == j){
+                            target += -ibd_number[b][i,j] * cm * 80.0 * 79.0 /2.0;
+                        } else {
+                            target += -ibd_number[b][i,j] * cm * 80.0 * 80.0;
+                        }
                     }
                 
             }

@@ -8,9 +8,9 @@ Options in effect:
 
 Hostname: QideMac-Studio.local
 Working directory: /Users/qichen/github/admix_stan/new_pipeline
-Start time: Thu Mar 19 19:31:09 2026
+Start time: Wed Mar 25 14:30:05 2026
 
-Random number seed: 1773948669
+Random number seed: 1774449005
 32768 MB RAM detected; reserving 16384 MB for main workspace.
 13286 variants loaded from .bim file.
 100 people (0 males, 0 females, 100 ambiguous) loaded from .fam.
@@ -26,4 +26,4 @@ Pruning complete.  11766 of 13286 variants removed.
 Marker lists written to plink_output/pruned.prune.in and
 plink_output/pruned.prune.out .
 
-End time: Thu Mar 19 19:31:09 2026
+End time: Wed Mar 25 14:30:05 2026
