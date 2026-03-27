@@ -76,7 +76,7 @@ data {
 parameters {
     vector<lower=1>[n_events] times;
     array[n_admixture] real<lower=0, upper=1> admixture_fractions;
-    real<lower=1> effective_N;
+    real<lower=1000, upper=20000> effective_N;
 }
 
 transformed parameters {
@@ -224,9 +224,9 @@ model {
                         target += normal_lpdf(ibd_hat[b][i,j] |ibd_fraction[b][i, j], ibd_se[b][i, j]);
                     } else {
                         if(i == j){
-                            target += -ibd_number[b][i,j] * cm * 80.0 * 79.0 /2.0;
+                            target += -ibd_number[b][i,j] * cm * 30.0 * 29.0 /2.0;
                         } else {
-                            target += -ibd_number[b][i,j] * cm * 80.0 * 80.0;
+                            target += -ibd_number[b][i,j] * cm * 30.0 * 30.0;
                         }
                     }
                 

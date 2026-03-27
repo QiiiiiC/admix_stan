@@ -2,10 +2,11 @@
 Block-bootstrap IBD resampling module (vectorized).
 
 Strategy:
-  1. Simulate ONCE with a large genome.
-  2. Compute per-pair, per-block IBD contributions (expensive, done once).
-  3. Pack everything into dense arrays so resampling is pure numpy indexing.
-  4. Each resample: pick block indices, sum columns, take mean. No Python loops over pairs.
+  1. Simulate MULTIPLE independent genomes (e.g. 5 x 500 cM).
+  2. Compute per-pair, per-block IBD contributions for each (expensive, done once).
+  3. Pool all blocks across simulations into one array.
+  4. Resample blocks with replacement — drawing from multiple realizations
+     avoids converging to a single simulation's idiosyncratic coalescent history.
 """
 
 import numpy as np
@@ -61,7 +62,7 @@ def calculate_ibd_blocks_mrca(
     print(f"Genome: {genome_length_cm:.1f} cM -> {n_blocks} blocks of {block_size_cm} cM "
           f"(using {n_blocks * block_size_cm:.1f} cM)")
 
-    # --- Phase 1: collect into sparse dicts (same as before) ---
+    # --- Phase 1: collect into sparse dicts ---
     raw = {
         b_i: defaultdict(lambda: defaultdict(lambda: np.zeros(n_blocks)))
         for b_i in range(len(bins))
@@ -135,8 +136,6 @@ def calculate_ibd_blocks_mrca(
     print("Block-level IBD computation complete. Packing into dense arrays...")
 
     # --- Phase 2: pack into dense arrays ---
-    # For each (bin, pop_i, pop_j), create array of shape (num_pairs, n_blocks)
-    # including zero-IBD pairs as zero rows.
     packed = {}
 
     for b_i in range(len(bins)):
@@ -160,7 +159,7 @@ def calculate_ibd_blocks_mrca(
                 n_zeros = num_pairs - n_observed
 
                 if n_observed > 0:
-                    obs_arr = np.array(list(observed_dict.values()))  # (n_observed, n_blocks)
+                    obs_arr = np.array(list(observed_dict.values()))
                     if n_zeros > 0:
                         arr = np.vstack([obs_arr, np.zeros((n_zeros, n_blocks))])
                     else:
@@ -173,6 +172,41 @@ def calculate_ibd_blocks_mrca(
     print("Packing complete.")
 
     return packed, n_blocks, dict(pop_samples), pop_ids
+
+
+def pool_multiple_simulations(packed_list, n_blocks_list):
+    """
+    Concatenate block arrays from multiple independent simulations.
+
+    Parameters
+    ----------
+    packed_list : list of dict
+        Each element is the `packed` output from calculate_ibd_blocks_mrca.
+        All must have the same keys (same topology, same bins, same sample sizes).
+
+    n_blocks_list : list of int
+        Number of blocks from each simulation.
+
+    Returns
+    -------
+    pooled : dict
+        Same structure as packed, but with columns concatenated across simulations.
+
+    total_blocks : int
+        Total number of blocks across all simulations.
+    """
+    total_blocks = sum(n_blocks_list)
+    keys = list(packed_list[0].keys())
+
+    pooled = {}
+    for key in keys:
+        arrays = [p[key] for p in packed_list]
+        # All should have same number of rows (same num_pairs)
+        # Concatenate along columns (blocks axis)
+        pooled[key] = np.hstack(arrays)
+
+    print(f"Pooled {len(packed_list)} simulations: {total_blocks} total blocks")
+    return pooled, total_blocks
 
 
 def resample_ibd_with_bootstrap_variance(
@@ -188,8 +222,6 @@ def resample_ibd_with_bootstrap_variance(
 ):
     """
     Block-bootstrap one IBD fraction matrix. All operations are vectorized numpy.
-
-    Complexity: O(n_bins * n_pop_pairs) array ops, no Python loops over sample pairs.
     """
     if rng is None:
         rng = np.random.default_rng()
@@ -210,23 +242,19 @@ def resample_ibd_with_bootstrap_variance(
 
         for i in range(num_pops):
             for j in range(i, num_pops):
-                arr = packed[(b_i, i, j)]  # (num_pairs, n_blocks)
+                arr = packed[(b_i, i, j)]
                 num_pairs = arr.shape[0]
 
                 if num_pairs == 0:
                     continue
 
-                # Vectorized: select columns, sum across chosen blocks, get per-pair mean
-                # arr[:, chosen_blocks] is (num_pairs, n_blocks_needed)
-                pair_fracs = arr[:, chosen_blocks].sum(axis=1) / n_blocks_needed  # (num_pairs,)
+                pair_fracs = arr[:, chosen_blocks].sum(axis=1) / n_blocks_needed
 
                 mean_val = pair_fracs.mean()
 
-                # Bootstrap variance over pairs
                 if n_var_bootstraps > 0 and num_pairs > 1:
-                    # Draw bootstrap indices: (n_var_bootstraps, num_pairs)
                     boot_idx = rng.integers(0, num_pairs, size=(n_var_bootstraps, num_pairs))
-                    boot_means = pair_fracs[boot_idx].mean(axis=1)  # (n_var_bootstraps,)
+                    boot_means = pair_fracs[boot_idx].mean(axis=1)
                     var_val = boot_means.var()
                 else:
                     var_val = se_floor ** 2
