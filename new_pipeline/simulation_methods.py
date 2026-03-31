@@ -645,3 +645,216 @@ def build_ibd_stan_data(
     print(f"  ibd_se       : [{ibd_se.min():.3e},  {ibd_se.max():.3e}]")
 
     return ibd_data
+
+
+def build_snp_stan_data(
+    dem,
+    w_hat: np.ndarray,
+    w_se: np.ndarray,
+    effective_N: float,
+) -> dict:
+    """
+    Build a Stan data dictionary for snp_model_Nfixed.stan.
+
+    Parameters
+    ----------
+    dem : DemographicTopology
+    w_hat : np.ndarray (n_leaves, n_leaves)
+        Observed double-centered SNP covariance matrix.
+    w_se : np.ndarray (n_leaves, n_leaves)
+        Standard errors for w_hat entries.
+    effective_N : float
+        Haploid effective population size (fixed, passed as data).
+
+    Returns
+    -------
+    dict : ready for cmdstanpy.
+    """
+    data = {}
+
+    # -- Topology (same as IBD) --
+    matrices, events, admixture_map, admixture_map_id = \
+        dem.get_topology_matrix_representation()
+
+    n_leaves = len(dem.initial_leaves)
+    n_nodes = len(dem.nodes)
+    n_events = len(dem.ordered_events)
+
+    data['n_leaves']    = n_leaves
+    data['n_nodes']     = n_nodes
+    data['n_events']    = n_events
+    data['n_admixture'] = dem.n_admix
+    data['migration_matrices'] = matrices
+
+    m = []
+    for i in admixture_map_id.keys():
+        m.append(
+            [i, admixture_map_id[i]['child']] +
+            admixture_map_id[i]['parents']
+        )
+    data['admixture_map'] = m
+
+    data['admixture_indices']     = [i + 2 for i in admixture_map_id.keys()]
+    data['fixed_indices_shifted'] = [
+        i for i in range(2, n_events + 2)
+        if i not in data['admixture_indices']
+    ]
+    data['fixed_indices'] = [i - 1 for i in data['fixed_indices_shifted']]
+
+    # -- Leaf pairs --
+    pair_i_list = []
+    pair_j_list = []
+    for i in range(1, n_leaves + 1):
+        for j in range(i, n_leaves + 1):
+            pair_i_list.append(i)
+            pair_j_list.append(j)
+
+    data['n_leaf_pairs'] = len(pair_i_list)
+    data['pair_i'] = pair_i_list
+    data['pair_j'] = pair_j_list
+
+    # -- Fixed N --
+    data['effective_N'] = effective_N
+
+    # -- Observations --
+    assert w_hat.shape == (n_leaves, n_leaves), \
+        f"w_hat shape {w_hat.shape} != ({n_leaves},{n_leaves})"
+    data['w_hat'] = w_hat.tolist()
+    data['w_se']  = w_se.tolist()
+
+    print(f"[build_snp_stan_data] Stan data assembled:")
+    print(f"  n_leaves     : {n_leaves}")
+    print(f"  n_nodes      : {n_nodes}")
+    print(f"  n_events     : {n_events}")
+    print(f"  n_leaf_pairs : {data['n_leaf_pairs']}")
+    print(f"  effective_N  : {effective_N}")
+    print(f"  w_hat range  : [{w_hat.min():.3e}, {w_hat.max():.3e}]")
+    print(f"  w_se  range  : [{w_se.min():.3e}, {w_se.max():.3e}]")
+
+    return data
+
+
+def build_mixed_stan_data(
+    dem,
+    ibd_mean: dict,
+    ibd_var: dict,
+    bins: list,
+    w_hat: np.ndarray,
+    w_se: np.ndarray,
+    T_max: float = None,
+    se_floor: float = 1e-8,
+    cm: float = None,
+) -> dict:
+    """
+    Build a Stan data dictionary for mixed_model.stan (IBD + SNP composite
+    likelihood with effective_N as a parameter).
+
+    Parameters
+    ----------
+    dem : DemographicTopology
+    ibd_mean : dict
+        {bin_index: np.ndarray (n_leaves, n_leaves)} — mean IBD fractions.
+    ibd_var : dict
+        {bin_index: np.ndarray (n_leaves, n_leaves)} — IBD variances.
+    bins : list of [min_cM, max_cM]
+    w_hat : np.ndarray (n_leaves, n_leaves)
+        Observed double-centered SNP covariance matrix.
+    w_se : np.ndarray (n_leaves, n_leaves)
+        Standard errors for w_hat entries.
+    T_max : float
+        Upper bound for the final IBD epoch.
+    se_floor : float
+        Minimum SE for IBD observations.
+    cm : float
+        Genome length in cM for Poisson zero-IBD likelihood.
+
+    Returns
+    -------
+    dict : ready for cmdstanpy.
+    """
+    data = {}
+
+    # -- Topology (shared) --
+    matrices, events, admixture_map, admixture_map_id = \
+        dem.get_topology_matrix_representation()
+
+    n_leaves = len(dem.initial_leaves)
+    n_nodes = len(dem.nodes)
+    n_events = len(dem.ordered_events)
+
+    data['n_leaves']    = n_leaves
+    data['n_nodes']     = n_nodes
+    data['n_events']    = n_events
+    data['n_admixture'] = dem.n_admix
+    data['migration_matrices'] = matrices
+
+    m = []
+    for i in admixture_map_id.keys():
+        m.append(
+            [i, admixture_map_id[i]['child']] +
+            admixture_map_id[i]['parents']
+        )
+    data['admixture_map'] = m
+
+    data['admixture_indices']     = [i + 2 for i in admixture_map_id.keys()]
+    data['fixed_indices_shifted'] = [
+        i for i in range(2, n_events + 2)
+        if i not in data['admixture_indices']
+    ]
+    data['fixed_indices'] = [i - 1 for i in data['fixed_indices_shifted']]
+
+    # -- Leaf pairs (shared) --
+    pair_i_list = []
+    pair_j_list = []
+    for i in range(1, n_leaves + 1):
+        for j in range(i, n_leaves + 1):
+            pair_i_list.append(i)
+            pair_j_list.append(j)
+
+    data['n_leaf_pairs'] = len(pair_i_list)
+    data['pair_i'] = pair_i_list
+    data['pair_j'] = pair_j_list
+
+    # -- IBD-specific data --
+    data['T_max'] = T_max
+
+    n_bins = len(bins)
+    data['n_bins']     = n_bins
+    data['bin_length'] = [list(b) for b in bins]
+
+    assert len(ibd_mean) == n_bins, \
+        f"ibd_mean has {len(ibd_mean)} entries but bins has {n_bins}"
+
+    ibd_hat = np.zeros((n_bins, n_leaves, n_leaves))
+    ibd_se  = np.zeros((n_bins, n_leaves, n_leaves))
+
+    for b in range(n_bins):
+        ibd_hat[b] = ibd_mean[b]
+        se = np.sqrt(np.maximum(ibd_var[b], 0.0))
+        ibd_se[b]  = np.maximum(se, se_floor)
+
+    data['ibd_hat'] = ibd_hat.tolist()
+    data['ibd_se']  = ibd_se.tolist()
+    data['cm'] = cm
+
+    # -- SNP-specific data --
+    assert w_hat.shape == (n_leaves, n_leaves), \
+        f"w_hat shape {w_hat.shape} != ({n_leaves},{n_leaves})"
+    data['w_hat'] = w_hat.tolist()
+    data['w_se']  = w_se.tolist()
+
+    # -- Summary --
+    print(f"[build_mixed_stan_data] Stan data assembled (IBD + SNP composite):")
+    print(f"  n_leaves     : {n_leaves}")
+    print(f"  n_nodes      : {n_nodes}")
+    print(f"  n_events     : {n_events}")
+    print(f"  n_leaf_pairs : {data['n_leaf_pairs']}")
+    print(f"  n_bins       : {n_bins}")
+    print(f"  T_max        : {T_max:.0f} generations")
+    print(f"  cm           : {cm}")
+    print(f"  ibd_hat      : [{ibd_hat.min():.3e}, {ibd_hat.max():.3e}]")
+    print(f"  ibd_se       : [{ibd_se.min():.3e}, {ibd_se.max():.3e}]")
+    print(f"  w_hat range  : [{w_hat.min():.3e}, {w_hat.max():.3e}]")
+    print(f"  w_se  range  : [{w_se.min():.3e}, {w_se.max():.3e}]")
+
+    return data
