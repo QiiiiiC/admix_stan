@@ -300,6 +300,7 @@ def resample_ibd_with_jackknife_variance(
     target_cm: float,
     block_size_cm: float = 50.0,
     rng: np.random.Generator = None,
+    chosen_blocks: np.ndarray = None,
 ):
     """
     Block-bootstrap one IBD fraction matrix with jackknife variance estimation.
@@ -307,12 +308,18 @@ def resample_ibd_with_jackknife_variance(
     Block bootstrap draws m = target_cm / block_size_cm blocks with replacement
     to simulate a genome of length target_cm. The jackknife over haplotypes
     gives the variance of the mean IBD fraction across pairs.
+
+    If chosen_blocks is provided, those block indices are used directly
+    (for synchronized resampling with SNP data).
     """
     if rng is None:
         rng = np.random.default_rng()
 
-    n_blocks_needed = max(1, int(round(target_cm / block_size_cm)))
-    chosen_blocks = rng.integers(0, n_blocks_total, size=n_blocks_needed)
+    if chosen_blocks is None:
+        n_blocks_needed = max(1, int(round(target_cm / block_size_cm)))
+        chosen_blocks = rng.integers(0, n_blocks_total, size=n_blocks_needed)
+
+    n_blocks_needed = len(chosen_blocks)
 
     num_pops = len(pop_ids)
     n_bins = len(bins)
