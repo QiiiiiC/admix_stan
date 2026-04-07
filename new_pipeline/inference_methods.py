@@ -128,7 +128,8 @@ def prepare_snp_blocks(mts, dem, block_size_cm, cm_per_unit, cutoff_time=None, m
             f"Genome ({genome_length_cm:.1f} cM) shorter than one block ({block_size_cm} cM)."
         )
 
-    block_t_lists = [[] for _ in range(n_blocks)]
+    block_dev_lists = [[] for _ in range(n_blocks)]
+    block_het_lists = [[] for _ in range(n_blocks)]
     n_filtered = 0
     n_kept = 0
 
@@ -157,64 +158,67 @@ def prepare_snp_blocks(mts, dem, block_size_cm, cm_per_unit, cutoff_time=None, m
             n_filtered += 1
             continue
 
-        t = (freqs - mu) / np.sqrt(mu * (1.0 - mu))
-        block_t_lists[block_idx].append(t)
+        # Store unnormalized deviation and heterozygosity separately
+        # (TreeMix pooled normalization: ratio of sums, not sum of ratios)
+        dev = freqs - mu
+        het = mu * (1.0 - mu)
+        block_dev_lists[block_idx].append(dev)
+        block_het_lists[block_idx].append(het)
         n_kept += 1
 
-    snp_block_t = []
-    for tvecs in block_t_lists:
-        if len(tvecs) > 0:
-            snp_block_t.append(np.array(tvecs))
+    snp_blocks = []
+    for devs, hets in zip(block_dev_lists, block_het_lists):
+        if len(devs) > 0:
+            snp_blocks.append((np.array(devs), np.array(hets)))
         else:
-            snp_block_t.append(np.empty((0, n_pops)))
+            snp_blocks.append((np.empty((0, n_pops)), np.empty(0)))
 
     print(f"SNP blocks: {n_kept} SNPs kept across {n_blocks} blocks "
           f"({n_filtered} filtered), avg {n_kept / max(n_blocks, 1):.0f} SNPs/block")
 
-    return snp_block_t, n_blocks
+    return snp_blocks, n_blocks
 
 
-def pool_snp_blocks(snp_t_list):
+def pool_snp_blocks(snp_block_list):
     """
-    Concatenate per-block SNP t-vector lists from multiple simulations.
+    Concatenate per-block SNP data from multiple simulations.
 
     Parameters
     ----------
-    snp_t_list : list of list[np.ndarray]
-        Each element is a simulation's snp_block_t.
+    snp_block_list : list of list[tuple(np.ndarray, np.ndarray)]
+        Each element is a simulation's snp_blocks (list of (dev, het) tuples).
 
     Returns
     -------
-    pooled_t : list of np.ndarray
-        Flat list of per-genomic-block t-vector arrays.
+    pooled : list of tuple(np.ndarray, np.ndarray)
+        Flat list of per-genomic-block (dev, het) tuples.
     """
-    pooled_t = []
-    for t_list in snp_t_list:
-        pooled_t.extend(t_list)
-    total_snps = sum(len(t) for t in pooled_t)
-    print(f"Pooled SNP blocks: {len(pooled_t)} genomic blocks, "
+    pooled = []
+    for block_list in snp_block_list:
+        pooled.extend(block_list)
+    total_snps = sum(blk[0].shape[0] for blk in pooled)
+    print(f"Pooled SNP blocks: {len(pooled)} genomic blocks, "
           f"{total_snps} total SNPs")
-    return pooled_t
+    return pooled
 
 
-def resample_snp_covariance(snp_block_t, chosen_blocks,
+def resample_snp_covariance(snp_blocks, chosen_blocks,
                             n_haploid_per_pop=None,
                             se_block_size=500, se_floor=1e-8):
     """
-    Compute w_hat and w_se from resampled genomic blocks (TreeMix approach).
+    Compute w_hat and w_se from resampled genomic blocks (TreeMix pooled approach).
 
-    1. Gather all SNP t-vectors from the chosen genomic blocks.
-    2. w_hat = T'T / J  (covariance from all gathered SNPs).
-    3. Divide gathered SNPs into sub-blocks of se_block_size SNPs.
-    4. SE = sqrt(sum((w_k - w_hat)^2) / (B * (B-1)))  over sub-blocks.
-
-    The genomic blocks (50 cM) control which SNPs are selected;
-    the SE blocks (500 SNPs) are for TreeMix variance estimation.
+    Uses the pooled normalization matching the TreeMix software:
+        w_ij = sum_a (x_i - x_bar)(x_j - x_bar) / sum_a x_bar(1 - x_bar)
+    This is a ratio of sums (SNPs weighted by heterozygosity),
+    NOT a sum of ratios (equal weight per SNP).
 
     Parameters
     ----------
-    snp_block_t : list of np.ndarray
-        Per-genomic-block t-vectors (output of pool_snp_blocks).
+    snp_blocks : list of tuple(np.ndarray, np.ndarray)
+        Per-genomic-block (dev, het) tuples from pool_snp_blocks.
+        dev[k] has shape (n_snps_k, n_pops): frequency deviations (x - x_bar).
+        het[k] has shape (n_snps_k,): heterozygosities x_bar*(1-x_bar).
     chosen_blocks : np.ndarray of int
         Genomic block indices selected (same as IBD resampling).
     n_haploid_per_pop : array-like (n_pops,), optional
@@ -229,25 +233,35 @@ def resample_snp_covariance(snp_block_t, chosen_blocks,
     w_hat : np.ndarray (n_pops, n_pops)
     w_se  : np.ndarray (n_pops, n_pops)
     """
-    # 1. Gather all t-vectors from chosen genomic blocks
-    t_arrays = [snp_block_t[k] for k in chosen_blocks]
-    T = np.concatenate(t_arrays, axis=0)   # (J, n_pops)
-    J, n_pops = T.shape
+    # 1. Gather deviations and heterozygosities from chosen genomic blocks
+    dev_arrays = [snp_blocks[k][0] for k in chosen_blocks]
+    het_arrays = [snp_blocks[k][1] for k in chosen_blocks]
+    D = np.concatenate(dev_arrays, axis=0)   # (J, n_pops)
+    H = np.concatenate(het_arrays, axis=0)   # (J,)
+    J, n_pops = D.shape
 
     if J == 0:
         return np.zeros((n_pops, n_pops)), np.full((n_pops, n_pops), se_floor)
 
-    # 2. w_hat from all SNPs
-    w_hat = (T.T @ T) / J
+    # 2. Pooled covariance: w_hat = sum(d_a d_a') / sum(h_a)
+    #    (already double-centered because d_a = freqs - mean(freqs)
+    #     is zero-sum across populations by construction)
+    numer = D.T @ D          # (n_pops, n_pops)
+    denom = np.sum(H)        # scalar
+    w_hat = numer / denom
 
-    # 3. SE from 500-SNP sub-blocks
+    # 3. SE from sub-blocks (each block uses its own pooled covariance)
     B = J // se_block_size
     if B >= 2:
-        T_trunc = T[:B * se_block_size]
-        chunks = T_trunc.reshape(B, se_block_size, n_pops)
-        # Per-sub-block covariance: w_k = T_k'T_k / se_block_size
-        # Using einsum for efficiency: (B, n_pops, se_block_size) @ (B, se_block_size, n_pops)
-        w_blocks = np.einsum('bsp,bsq->bpq', chunks, chunks) / se_block_size
+        D_trunc = D[:B * se_block_size]
+        H_trunc = H[:B * se_block_size]
+        D_chunks = D_trunc.reshape(B, se_block_size, n_pops)
+        H_chunks = H_trunc.reshape(B, se_block_size)
+
+        numer_blocks = np.einsum('bsp,bsq->bpq', D_chunks, D_chunks)  # (B, n_pops, n_pops)
+        denom_blocks = H_chunks.sum(axis=1)                            # (B,)
+        w_blocks = numer_blocks / denom_blocks[:, np.newaxis, np.newaxis]
+
         w_mean = w_blocks.mean(axis=0)
         diff = w_blocks - w_mean[np.newaxis]
         sum_sq = np.sum(diff ** 2, axis=0)
@@ -255,7 +269,10 @@ def resample_snp_covariance(snp_block_t, chosen_blocks,
     else:
         w_se = np.full((n_pops, n_pops), se_floor)
 
-    # 4. TreeMix finite-sample correction
+    # 4. TreeMix finite-sample correction (Text S1 Eqs. 7-8):
+    #    With pooled normalization, diagonal bias is still 1/n_i
+    #    (sampling variance sum_a p(1-p)/n_i cancels with denom sum_a p(1-p)).
+    #    Double-center the correction to stay in centered space.
     if n_haploid_per_pop is not None:
         bias = 1.0 / np.asarray(n_haploid_per_pop, dtype=float)
         noise_raw = np.diag(bias)

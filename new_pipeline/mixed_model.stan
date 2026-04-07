@@ -76,6 +76,7 @@ parameters {
     vector<lower=1>[n_events] times;
     array[n_admixture] real<lower=0, upper=1> admixture_fractions;
     real<lower=1000, upper=20000> effective_N;
+    real<lower=0> kappa_snp;
 }
 
 transformed parameters {
@@ -228,8 +229,9 @@ model {
     times ~ exponential(0.01);
     admixture_fractions ~ uniform(0, 1);
     effective_N ~ normal(10000, 3000) T[1000, 20000];
+    kappa_snp ~ exponential(1);
 
-    // ---- IBD likelihood (composite) ----
+    // ---- IBD likelihood (composite, no overdispersion) ----
     for (i in 1:n_leaves) {
         for (j in i:n_leaves) {
             for (b in 1:n_bins) {
@@ -246,10 +248,10 @@ model {
         }
     }
 
-    // ---- SNP likelihood (composite) ----
+    // ---- SNP likelihood (composite, with learned overdispersion) ----
     for (i in 1:n_leaves) {
         for (j in i:n_leaves) {
-            w_hat[i, j] ~ normal(W_centered[i, j], w_se[i, j]);
+            w_hat[i, j] ~ normal(W_centered[i, j], w_se[i, j] * kappa_snp);
         }
     }
 }

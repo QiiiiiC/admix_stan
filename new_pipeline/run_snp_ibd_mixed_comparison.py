@@ -24,6 +24,29 @@ from ibd_jackknife import (
 )
 from demography import DemographicTopology
 from cmdstanpy import CmdStanModel
+import re
+
+
+def extract_elbo(fit):
+    """Extract the best ELBO from pathfinder stdout files.
+
+    CmdStan prints: Path [i] : Best Iter: [N] ELBO (value) evaluations: (count)
+    This parses those lines and returns the maximum ELBO across paths.
+    Works regardless of psis_resample setting.
+    """
+    best_elbo = -np.inf
+    for stdout_file in fit._runset.stdout_files:
+        try:
+            with open(stdout_file, 'r') as f:
+                for line in f:
+                    m = re.search(r'Best Iter:.*?ELBO \(([-+\d.eE]+)\)', line)
+                    if m:
+                        elbo_val = float(m.group(1))
+                        if elbo_val > best_elbo:
+                            best_elbo = elbo_val
+        except (OSError, ValueError):
+            continue
+    return best_elbo if np.isfinite(best_elbo) else np.nan
 
 # ====================================================================
 # 0. Configuration
@@ -36,25 +59,25 @@ MUT_RATE = 1e-6
 SAMPLES_PER_POP = {'a': 15, 'b': 15, 'c': 15, 'admix': 15}
 
 # Number of independent simulations to pool
-N_SIMS = 5
-SIM_CM_EACH = 500  # each sim is 500 cM → 5 x 500 = 2500 cM total, 50 blocks
+N_SIMS = 50
+SIM_CM_EACH = 50  # each sim is 50 cM → 50 x 50 = 2500 cM total, 50 blocks
 SIM_SEQ_LEN = SIM_CM_EACH / CM_PER_UNIT
 
 cm_values = [50, 100, 150, 200, 250, 300, 400, 500]
 
 bins = [
-    [0.5, 0.55], [0.55, 0.6], [0.6, 0.7], [0.7, 0.8], [0.8, 0.9], [0.9, 1.0],
-    [1.0, 1.5], [1.5, 2.0], [2.0, 5.0], [5.0, 10.0], [10.0, max(cm_values)]
+    [0.5, 0.55], [0.55, 0.6], [0.6, 0.65],[0.65, 0.7], [0.7, 0.8], [0.8, 0.9], [0.9, 1.0],
+    [1.0, 1.5], [1.5, 2.0], [2.0, 5.0], [5.0, 8.0],[8.0,20.0], [20.0, BLOCK_SIZE_CM]
 ]
 
 true_vals = {
     "Admixture time": 20,
     "Effective population size": 6000,
     "Admixture fraction": 0.75,
-    "Post-admixture merge time": 200,
+    "Post-admixture merge time": 1000,
 }
 
-SNP_CUTOFF_TIME = 500   # keep only mutations older than this
+SNP_CUTOFF_TIME = 1500  # keep only mutations older than this
 SNP_MIN_MAF = 0.05
 FIXED_NE = 6000         # fixed Ne for SNP-only model
 
@@ -72,8 +95,8 @@ for node in ['a','b','c','admix','admixPa1','admixPa2','aAdmix','bAdmix','subAnc
 dem.set_admixture_parameters('admix', 20, 0.75, 'admixPa1')
 dem.set_merge_time('aAdmix', 40)
 dem.set_merge_time('bAdmix', 50)
-dem.set_merge_time('subAnc', 200)
-dem.set_merge_time('anc', 500)
+dem.set_merge_time('subAnc', 1000)
+dem.set_merge_time('anc', 1500)
 dem.finalize_root()
 
 # ====================================================================
@@ -81,7 +104,7 @@ dem.finalize_root()
 # ====================================================================
 packed_list = []
 n_blocks_list = []
-snp_t_list = []
+snp_blocks_list = []
 pair_info = None
 
 for sim_i in range(N_SIMS):
@@ -107,19 +130,19 @@ for sim_i in range(N_SIMS):
     if pair_info is None:
         pair_info = pi
 
-    # SNP blocks: per-SNP t-vectors grouped by genomic block
-    snp_t, _ = prepare_snp_blocks(
+    # SNP blocks: per-SNP (deviation, heterozygosity) grouped by genomic block
+    snp_blks, _ = prepare_snp_blocks(
         mts, dem,
         block_size_cm=BLOCK_SIZE_CM,
         cm_per_unit=CM_PER_UNIT,
         cutoff_time=SNP_CUTOFF_TIME,
         min_maf=SNP_MIN_MAF,
     )
-    snp_t_list.append(snp_t)
+    snp_blocks_list.append(snp_blks)
 
 # Pool across simulations
 pooled_ibd, total_blocks = pool_multiple_simulations(packed_list, n_blocks_list)
-pooled_snp_t = pool_snp_blocks(snp_t_list)
+pooled_snp = pool_snp_blocks(snp_blocks_list)
 
 print(f"\nTotal pool: {total_blocks} blocks of {BLOCK_SIZE_CM} cM "
       f"= {total_blocks * BLOCK_SIZE_CM} cM from {N_SIMS} independent simulations")
@@ -137,6 +160,9 @@ mixed_model = CmdStanModel(stan_file="mixed_model.stan")
 results_ibd = {cm_val: [] for cm_val in cm_values}
 results_snp = {cm_val: [] for cm_val in cm_values}
 results_mixed = {cm_val: [] for cm_val in cm_values}
+elbo_ibd = {cm_val: [] for cm_val in cm_values}
+elbo_snp = {cm_val: [] for cm_val in cm_values}
+elbo_mixed = {cm_val: [] for cm_val in cm_values}
 
 rng = np.random.default_rng(seed=2025)
 
@@ -151,8 +177,8 @@ for cm_val in cm_values:
         if (rep + 1) % 10 == 0:
             print(f"  replicate {rep + 1}/{N_REPLICATES}")
 
-        # Select blocks ONCE for both IBD and SNP
-        chosen_blocks = rng.integers(0, total_blocks, size=n_blocks_needed)
+        # Select blocks ONCE for both IBD and SNP (without replacement)
+        chosen_blocks = rng.choice(total_blocks, size=n_blocks_needed, replace=False)
 
         # --- Resample IBD ---
         ibd_mean, ibd_var = resample_ibd_with_jackknife_variance(
@@ -166,12 +192,13 @@ for cm_val in cm_values:
             chosen_blocks=chosen_blocks,
         )
 
-        # --- Resample SNP (TreeMix: gather SNPs, 500-SNP SE blocks) ---
+        # --- Resample SNP (TreeMix: gather SNPs, 50-SNP SE blocks) ---
         leaves = dem.initial_leaves
         n_haploid = np.array([SAMPLES_PER_POP[p] * 2 for p in leaves])
         w_hat, w_se = resample_snp_covariance(
-            pooled_snp_t, chosen_blocks,
+            pooled_snp, chosen_blocks,
             n_haploid_per_pop=n_haploid,
+            se_block_size=50,
         )
 
         # --- Init dicts ---
@@ -191,6 +218,7 @@ for cm_val in cm_values:
             "times": [100.0] * n_events,
             "admixture_fractions": [0.5] * n_admix,
             "effective_N": 10000.0,
+            "kappa_snp": 1.0,
         }
 
         # --- Model 1: IBD-only ---
@@ -201,10 +229,12 @@ for cm_val in cm_values:
             )
             fit = ibd_model.pathfinder(
                 data=stan_data, inits=init_ibd, show_console=False,
+                psis_resample=True,
             )
             all_vars = fit.stan_variables()
             pmeans = {name: draws.mean(axis=0) for name, draws in all_vars.items()}
             results_ibd[cm_val].append(pmeans)
+            elbo_ibd[cm_val].append(extract_elbo(fit))
         except Exception as e:
             print(f"    [WARN] IBD rep {rep+1} failed: {e}")
 
@@ -215,10 +245,12 @@ for cm_val in cm_values:
             )
             fit = snp_model.pathfinder(
                 data=stan_data, inits=init_snp, show_console=False,
+                psis_resample=True,
             )
             all_vars = fit.stan_variables()
             pmeans = {name: draws.mean(axis=0) for name, draws in all_vars.items()}
             results_snp[cm_val].append(pmeans)
+            elbo_snp[cm_val].append(extract_elbo(fit))
         except Exception as e:
             print(f"    [WARN] SNP rep {rep+1} failed: {e}")
 
@@ -230,10 +262,12 @@ for cm_val in cm_values:
             )
             fit = mixed_model.pathfinder(
                 data=stan_data, inits=init_mixed, show_console=False,
+                psis_resample=True,
             )
             all_vars = fit.stan_variables()
             pmeans = {name: draws.mean(axis=0) for name, draws in all_vars.items()}
             results_mixed[cm_val].append(pmeans)
+            elbo_mixed[cm_val].append(extract_elbo(fit))
         except Exception as e:
             print(f"    [WARN] Mixed rep {rep+1} failed: {e}")
 
@@ -261,18 +295,17 @@ def extract_param(pmeans_dict, param_name, has_ne=True):
 
 
 # ====================================================================
-# 6. Plot: 4 parameter subplots as boxplots
+# 6a. Plot 1: Parameter comparison (2x2)
 # ====================================================================
-fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+fig1, axes1 = plt.subplots(2, 2, figsize=(16, 12))
 
-param_names = list(true_vals.keys())
 model_labels = ["IBD-only", "SNP-only", "Mixed"]
 model_colors = ["#378ADD", "#4CAF50", "#E8A838"]
 model_results = [results_ibd, results_snp, results_mixed]
 model_has_ne = [True, False, True]
+from matplotlib.patches import Patch
 
-for ax, (name, tv) in zip(axes.flatten(), true_vals.items()):
-    # Skip Ne for SNP-only (it's fixed)
+for ax, (name, tv) in zip(axes1.flatten(), true_vals.items()):
     if name == "Effective population size":
         active_labels = ["IBD-only", "Mixed"]
         active_colors = ["#378ADD", "#E8A838"]
@@ -319,7 +352,6 @@ for ax, (name, tv) in zip(axes.flatten(), true_vals.items()):
 
     ax.axhline(tv, color="#E24B4A", ls="--", lw=1.5, label=f"True = {tv}")
 
-    # X-axis: label by cm_value at group centers
     group_centers = [cm_idx * (n_models + 1) + (n_models - 1) / 2
                      for cm_idx in range(n_cms)]
     ax.set_xticks(group_centers)
@@ -328,19 +360,63 @@ for ax, (name, tv) in zip(axes.flatten(), true_vals.items()):
     ax.set_title(name)
     ax.grid(axis="y", alpha=0.15)
 
-    # Legend
-    from matplotlib.patches import Patch
     handles = [Patch(facecolor=c, alpha=0.5, label=l)
                for c, l in zip(active_colors, active_labels)]
     handles.append(plt.Line2D([0], [0], color="#E24B4A", ls="--", lw=1.5, label=f"True = {tv}"))
     ax.legend(handles=handles, fontsize=8)
 
-plt.suptitle("IBD-only vs SNP-only vs Mixed: Posterior Mean Comparison",
-             fontsize=14, fontweight="bold")
-plt.tight_layout()
-plt.savefig("snp_ibd_mixed_comparison.png", dpi=200, bbox_inches="tight")
+fig1.suptitle("IBD-only vs SNP-only vs Mixed: Posterior Mean Comparison",
+              fontsize=14, fontweight="bold")
+fig1.tight_layout()
+fig1.savefig("snp_ibd_mixed_comparison.png", dpi=200, bbox_inches="tight")
 plt.show()
 print("Saved: snp_ibd_mixed_comparison.png")
+
+# ====================================================================
+# 6b. Plot 2: ELBO comparison (overlapping boxplots per genome length)
+# ====================================================================
+fig2, ax_elbo = plt.subplots(1, 1, figsize=(14, 5))
+
+elbo_results = [elbo_ibd, elbo_snp, elbo_mixed]
+n_models = len(model_labels)
+n_cms = len(cm_values)
+
+# Plot each model as a separate boxplot layer at the same x positions
+x_positions = list(range(n_cms))
+for m_idx in range(n_models):
+    data = [np.array(elbo_results[m_idx][cm_val]) for cm_val in cm_values]
+    bp = ax_elbo.boxplot(
+        data,
+        positions=x_positions,
+        widths=0.5,
+        patch_artist=True,
+        showfliers=False,
+        medianprops=dict(color="k", linewidth=1.5),
+        whiskerprops=dict(color=model_colors[m_idx], linewidth=1, alpha=0.6),
+        capprops=dict(color=model_colors[m_idx], linewidth=1, alpha=0.6),
+    )
+    for patch in bp['boxes']:
+        patch.set_facecolor(model_colors[m_idx])
+        patch.set_alpha(0.3)
+
+    # Trend line connecting mean ELBO
+    mean_values = [np.mean(d) for d in data]
+    ax_elbo.plot(x_positions, mean_values, color=model_colors[m_idx],
+                 linewidth=2, marker='o', markersize=5, zorder=5,
+                 label=model_labels[m_idx])
+
+ax_elbo.set_xticks(x_positions)
+ax_elbo.set_xticklabels([f"{cm}" for cm in cm_values])
+ax_elbo.set_xlabel("Genome length (cM)")
+ax_elbo.set_ylabel("ELBO")
+ax_elbo.set_title("ELBO (from pathfinder optimization)")
+ax_elbo.grid(axis="y", alpha=0.15)
+ax_elbo.legend(fontsize=8)
+
+fig2.tight_layout()
+fig2.savefig("elbo_comparison.png", dpi=200, bbox_inches="tight")
+plt.show()
+print("Saved: elbo_comparison.png")
 
 # ====================================================================
 # 7. Print summary table
