@@ -7,6 +7,11 @@ Compare variational inference (pathfinder) vs MCMC:
 MCMC: chains=4, iter_warmup=1000, iter_sampling=2000.
 """
 
+import sys, os
+_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _PARENT)
+_MODELS = os.path.join(_PARENT, "models")
+
 import time
 import numpy as np
 import matplotlib.pyplot as plt
@@ -104,7 +109,7 @@ print(f"\nTotal pool: {total_blocks} blocks of {BLOCK_SIZE_CM} cM "
 # ====================================================================
 # 3. Compile Stan model
 # ====================================================================
-model = CmdStanModel(stan_file="ibd_model_Nfixed.stan")
+model = CmdStanModel(stan_file=os.path.join(_MODELS, "ibd_model_Nfixed.stan"))
 
 # ====================================================================
 # 4. Run replicates

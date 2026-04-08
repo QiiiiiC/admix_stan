@@ -23,10 +23,14 @@ Only the mixed model is used.
 Plot: ELBO(T1) - ELBO(T_rev) vs genome length.
 """
 
+import sys, os
+_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _PARENT)
+_MODELS = os.path.join(_PARENT, "models")
+
 import numpy as np
 import matplotlib.pyplot as plt
 import re
-import os
 from contextlib import redirect_stdout
 
 from simulation_methods import (
@@ -182,7 +186,7 @@ print(f"\nTotal pool: {total_blocks} blocks of {BLOCK_SIZE_CM} cM "
 # ====================================================================
 # 3. Compile Stan model (mixed only)
 # ====================================================================
-mixed_stan = CmdStanModel(stan_file="mixed_model.stan")
+mixed_stan = CmdStanModel(stan_file=os.path.join(_MODELS, "mixed_model_Nfixed.stan"))
 
 
 # ====================================================================

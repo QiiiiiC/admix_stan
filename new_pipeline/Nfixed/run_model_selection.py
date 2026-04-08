@@ -15,10 +15,14 @@ Plots:
   2. Softmax model weight w(T1) vs genome length (1 panel, 3 model types)
 """
 
+import sys, os
+_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _PARENT)
+_MODELS = os.path.join(_PARENT, "models")
+
 import numpy as np
 import matplotlib.pyplot as plt
 import re
-import os
 from contextlib import redirect_stdout
 
 from simulation_methods import (
@@ -195,9 +199,9 @@ print(f"\nTotal pool: {total_blocks} blocks of {BLOCK_SIZE_CM} cM "
 # ====================================================================
 # 3. Compile Stan models
 # ====================================================================
-ibd_stan = CmdStanModel(stan_file="ibd_model_Nfixed.stan")
-snp_stan = CmdStanModel(stan_file="snp_model_Nfixed.stan")
-mixed_stan = CmdStanModel(stan_file="mixed_model.stan")
+ibd_stan = CmdStanModel(stan_file=os.path.join(_MODELS, "ibd_model_Nfixed.stan"))
+snp_stan = CmdStanModel(stan_file=os.path.join(_MODELS, "snp_model_Nfixed.stan"))
+mixed_stan = CmdStanModel(stan_file=os.path.join(_MODELS, "mixed_model_Nfixed.stan"))
 
 
 # ====================================================================

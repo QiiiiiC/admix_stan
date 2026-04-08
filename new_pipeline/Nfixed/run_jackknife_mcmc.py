@@ -1,18 +1,27 @@
 """
 Run N_REPLICATES of IBD-based demographic inference using:
   - Multiple independent simulations pooled for block-bootstrap
-  - CmdStan pathfinder (fast approximate posterior)
+  - Delete-one-haplotype jackknife for variance estimation
+  - CmdStan MCMC sampling (full posterior, no pathfinder approximation)
+
+Purpose: diagnose whether the ~2.5% downward Ne bias seen with pathfinder
+is an inference artifact or a model issue.
 """
+
+import sys, os
+_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _PARENT)
+_MODELS = os.path.join(_PARENT, "models")
 
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
 from simulation_methods import simulate_msprime, build_ibd_stan_data
-from bootstrap_ibd import (
+from ibd_jackknife import (
     calculate_ibd_blocks_mrca,
     pool_multiple_simulations,
-    resample_ibd_with_bootstrap_variance,
+    resample_ibd_with_jackknife_variance,
 )
 from demography import DemographicTopology
 from cmdstanpy import CmdStanModel
@@ -21,7 +30,7 @@ from cmdstanpy import CmdStanModel
 # ====================================================================
 # 0. Configuration
 # ====================================================================
-N_REPLICATES = 200
+N_REPLICATES = 50  # fewer replicates since MCMC is slower
 BLOCK_SIZE_CM = 50.0
 CM_PER_UNIT = 1e-4
 RECOMB_RATE = 1e-6
@@ -30,10 +39,10 @@ SAMPLES_PER_POP = {'a': 15, 'b': 15, 'c': 15, 'admix': 15}
 
 # Number of independent simulations to pool
 N_SIMS = 5
-SIM_CM_EACH = 500  # each sim is 500 cM → 5 x 500 = 2500 cM total, 50 blocks
+SIM_CM_EACH = 500  # each sim is 500 cM -> 5 x 500 = 2500 cM total, 50 blocks
 SIM_SEQ_LEN = SIM_CM_EACH / CM_PER_UNIT
 
-cm_values = [50, 100, 150, 200, 250, 300, 400, 500]
+cm_values = [50, 100, 200, 500]  # fewer cm values for speed
 
 bins = [
     [0.5, 0.55], [0.55, 0.6], [0.6, 0.7], [0.7, 0.8], [0.8, 0.9], [0.9, 1.0],
@@ -70,6 +79,7 @@ dem.finalize_root()
 # ====================================================================
 packed_list = []
 n_blocks_list = []
+pair_info = None
 
 for sim_i in range(N_SIMS):
     print(f"\n--- Simulation {sim_i + 1}/{N_SIMS} ({SIM_CM_EACH} cM) ---")
@@ -82,7 +92,7 @@ for sim_i in range(N_SIMS):
         seed=42 + sim_i,  # different seed for each
     )
 
-    packed, n_blocks, pop_samples, pop_ids = calculate_ibd_blocks_mrca(
+    packed, n_blocks, pop_samples, pop_ids, pi = calculate_ibd_blocks_mrca(
         mts,
         bins=bins,
         block_size_cm=BLOCK_SIZE_CM,
@@ -90,6 +100,8 @@ for sim_i in range(N_SIMS):
     )
     packed_list.append(packed)
     n_blocks_list.append(n_blocks)
+    if pair_info is None:
+        pair_info = pi  # same for all sims (same topology & sample sizes)
 
 # Pool all blocks into one array
 pooled, total_blocks = pool_multiple_simulations(packed_list, n_blocks_list)
@@ -99,12 +111,13 @@ print(f"\nTotal pool: {total_blocks} blocks of {BLOCK_SIZE_CM} cM "
 # ====================================================================
 # 3. Compile Stan model once
 # ====================================================================
-model = CmdStanModel(stan_file="ibd_model_Nfixed.stan")
+model = CmdStanModel(stan_file=os.path.join(_MODELS, "ibd_model_Nfixed.stan"))
 
 # ====================================================================
-# 4. Run replicates
+# 4. Run replicates with MCMC
 # ====================================================================
-results = {cm_val: [] for cm_val in cm_values}
+results_mcmc = {cm_val: [] for cm_val in cm_values}
+results_pathfinder = {cm_val: [] for cm_val in cm_values}
 rng = np.random.default_rng(seed=2025)
 
 for cm_val in cm_values:
@@ -113,18 +126,17 @@ for cm_val in cm_values:
     print(f"{'='*60}")
 
     for rep in range(N_REPLICATES):
-        if (rep + 1) % 10 == 0:
+        if (rep + 1) % 5 == 0:
             print(f"  replicate {rep + 1}/{N_REPLICATES}")
 
-        ibd_mean, ibd_var = resample_ibd_with_bootstrap_variance(
+        ibd_mean, ibd_var = resample_ibd_with_jackknife_variance(
             pooled,
             n_blocks_total=total_blocks,
-            pop_samples=pop_samples,
             pop_ids=pop_ids,
+            pair_info=pair_info,
             bins=bins,
             target_cm=cm_val,
             block_size_cm=BLOCK_SIZE_CM,
-            n_var_bootstraps=1000,
             rng=rng,
         )
 
@@ -139,23 +151,45 @@ for cm_val in cm_values:
             "effective_N": 10000.0,
         }
 
+        # --- MCMC sampling ---
         try:
-            fit = model.pathfinder(
+            fit_mcmc = model.sample(
+                data=stan_ibd,
+                inits=init_dict,
+                chains=2,
+                iter_warmup=500,
+                iter_sampling=500,
+                show_console=False,
+                seed=rep + cm_val,
+            )
+
+            all_vars = fit_mcmc.stan_variables()
+            pmeans = {
+                name: draws.mean(axis=0)
+                for name, draws in all_vars.items()
+            }
+            results_mcmc[cm_val].append(pmeans)
+
+        except Exception as e:
+            print(f"    [WARN] MCMC replicate {rep+1} failed: {e}")
+
+        # --- Pathfinder (same data, for comparison) ---
+        try:
+            fit_pf = model.pathfinder(
                 data=stan_ibd,
                 inits=init_dict,
                 show_console=False,
             )
 
-            all_vars = fit.stan_variables()
+            all_vars = fit_pf.stan_variables()
             pmeans = {
                 name: draws.mean(axis=0)
                 for name, draws in all_vars.items()
             }
-            results[cm_val].append(pmeans)
+            results_pathfinder[cm_val].append(pmeans)
 
         except Exception as e:
-            print(f"    [WARN] replicate {rep+1} failed: {e}")
-            continue
+            print(f"    [WARN] Pathfinder replicate {rep+1} failed: {e}")
 
 # ====================================================================
 # 5. Extract posterior means for plotting
@@ -175,38 +209,74 @@ def extract_param(pmeans_dict, param_name):
         raise ValueError(f"Unknown param: {param_name}")
 
 # ====================================================================
-# 6. Plot
+# 6. Plot side-by-side comparison
 # ====================================================================
 fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
 for ax, (name, tv) in zip(axes.flatten(), true_vals.items()):
-    samples_list = []
+    mcmc_samples = []
+    pf_samples = []
 
     for cm_val in cm_values:
-        vals = [extract_param(pm, name) for pm in results[cm_val]]
-        samples_list.append(np.array(vals))
+        mcmc_vals = [extract_param(pm, name) for pm in results_mcmc[cm_val]]
+        pf_vals = [extract_param(pm, name) for pm in results_pathfinder[cm_val]]
+        mcmc_samples.append(np.array(mcmc_vals))
+        pf_samples.append(np.array(pf_vals))
 
-    bp = ax.boxplot(
-        samples_list,
-        positions=range(len(cm_values)),
-        widths=0.5,
+    positions = np.arange(len(cm_values))
+    width = 0.3
+
+    # MCMC boxplots (left, blue)
+    bp1 = ax.boxplot(
+        mcmc_samples,
+        positions=positions - width/2,
+        widths=width * 0.8,
         patch_artist=True,
         showfliers=False,
         medianprops=dict(color="#BA7517", linewidth=2),
         whiskerprops=dict(color="k", linewidth=1.2),
         capprops=dict(color="k", linewidth=1.2),
-        boxprops=dict(facecolor="#378ADD", alpha=0.3, edgecolor="#185FA5", linewidth=1.2),
+        boxprops=dict(facecolor="#378ADD", alpha=0.4, edgecolor="#185FA5", linewidth=1.2),
+    )
+
+    # Pathfinder boxplots (right, orange)
+    bp2 = ax.boxplot(
+        pf_samples,
+        positions=positions + width/2,
+        widths=width * 0.8,
+        patch_artist=True,
+        showfliers=False,
+        medianprops=dict(color="#BA7517", linewidth=2),
+        whiskerprops=dict(color="k", linewidth=1.2),
+        capprops=dict(color="k", linewidth=1.2),
+        boxprops=dict(facecolor="#E8A838", alpha=0.4, edgecolor="#C07010", linewidth=1.2),
     )
 
     ax.axhline(tv, color="#E24B4A", ls="--", lw=1.5, label=f"True = {tv}")
-    ax.legend(fontsize=10)
-    ax.set_xticks(range(len(cm_values)))
+    ax.legend(
+        [bp1["boxes"][0], bp2["boxes"][0], ax.get_lines()[-1]],
+        ["MCMC", "Pathfinder", f"True = {tv}"],
+        fontsize=9,
+    )
+    ax.set_xticks(positions)
     ax.set_xticklabels([f"{cm} cM" for cm in cm_values])
     ax.set_xlabel("Genome length (cM)")
     ax.set_title(name)
     ax.grid(axis="y", alpha=0.15)
 
+plt.suptitle("MCMC vs Pathfinder: Ne bias diagnostic", fontsize=14, fontweight="bold")
 plt.tight_layout()
-plt.savefig("posterior_mean_convergence.png", dpi=200, bbox_inches="tight")
+plt.savefig("mcmc_vs_pathfinder_comparison.png", dpi=200, bbox_inches="tight")
 plt.show()
-print("Saved: posterior_mean_convergence.png")
+print("Saved: mcmc_vs_pathfinder_comparison.png")
+
+# Print summary statistics
+print("\n" + "="*60)
+print("Summary: Mean Ne across replicates")
+print("="*60)
+for cm_val in cm_values:
+    mcmc_ne = [extract_param(pm, "Effective population size") for pm in results_mcmc[cm_val]]
+    pf_ne = [extract_param(pm, "Effective population size") for pm in results_pathfinder[cm_val]]
+    print(f"  {cm_val:4d} cM: MCMC = {np.mean(mcmc_ne):8.1f} (n={len(mcmc_ne)}), "
+          f"Pathfinder = {np.mean(pf_ne):8.1f} (n={len(pf_ne)}), "
+          f"True = 6000")

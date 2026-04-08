@@ -1,19 +1,23 @@
 """
 Run N_REPLICATES of IBD-based demographic inference using:
   - Multiple independent simulations pooled for block-bootstrap
-  - Delete-one-haplotype jackknife for variance estimation
   - CmdStan pathfinder (fast approximate posterior)
 """
+
+import sys, os
+_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _PARENT)
+_MODELS = os.path.join(_PARENT, "models")
 
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
 from simulation_methods import simulate_msprime, build_ibd_stan_data
-from ibd_jackknife import (
+from bootstrap_ibd import (
     calculate_ibd_blocks_mrca,
     pool_multiple_simulations,
-    resample_ibd_with_jackknife_variance,
+    resample_ibd_with_bootstrap_variance,
 )
 from demography import DemographicTopology
 from cmdstanpy import CmdStanModel
@@ -71,7 +75,6 @@ dem.finalize_root()
 # ====================================================================
 packed_list = []
 n_blocks_list = []
-pair_info = None
 
 for sim_i in range(N_SIMS):
     print(f"\n--- Simulation {sim_i + 1}/{N_SIMS} ({SIM_CM_EACH} cM) ---")
@@ -84,7 +87,7 @@ for sim_i in range(N_SIMS):
         seed=42 + sim_i,  # different seed for each
     )
 
-    packed, n_blocks, pop_samples, pop_ids, pi = calculate_ibd_blocks_mrca(
+    packed, n_blocks, pop_samples, pop_ids = calculate_ibd_blocks_mrca(
         mts,
         bins=bins,
         block_size_cm=BLOCK_SIZE_CM,
@@ -92,8 +95,6 @@ for sim_i in range(N_SIMS):
     )
     packed_list.append(packed)
     n_blocks_list.append(n_blocks)
-    if pair_info is None:
-        pair_info = pi  # same for all sims (same topology & sample sizes)
 
 # Pool all blocks into one array
 pooled, total_blocks = pool_multiple_simulations(packed_list, n_blocks_list)
@@ -103,7 +104,7 @@ print(f"\nTotal pool: {total_blocks} blocks of {BLOCK_SIZE_CM} cM "
 # ====================================================================
 # 3. Compile Stan model once
 # ====================================================================
-model = CmdStanModel(stan_file="ibd_model_Nfixed.stan")
+model = CmdStanModel(stan_file=os.path.join(_MODELS, "ibd_model_Nfixed.stan"))
 
 # ====================================================================
 # 4. Run replicates
@@ -120,14 +121,15 @@ for cm_val in cm_values:
         if (rep + 1) % 10 == 0:
             print(f"  replicate {rep + 1}/{N_REPLICATES}")
 
-        ibd_mean, ibd_var = resample_ibd_with_jackknife_variance(
+        ibd_mean, ibd_var = resample_ibd_with_bootstrap_variance(
             pooled,
             n_blocks_total=total_blocks,
+            pop_samples=pop_samples,
             pop_ids=pop_ids,
-            pair_info=pair_info,
             bins=bins,
             target_cm=cm_val,
             block_size_cm=BLOCK_SIZE_CM,
+            n_var_bootstraps=1000,
             rng=rng,
         )
 
@@ -210,6 +212,6 @@ for ax, (name, tv) in zip(axes.flatten(), true_vals.items()):
     ax.grid(axis="y", alpha=0.15)
 
 plt.tight_layout()
-plt.savefig("posterior_mean_convergence_jackknife.png", dpi=200, bbox_inches="tight")
+plt.savefig("posterior_mean_convergence.png", dpi=200, bbox_inches="tight")
 plt.show()
-print("Saved: posterior_mean_convergence_jackknife.png")
+print("Saved: posterior_mean_convergence.png")

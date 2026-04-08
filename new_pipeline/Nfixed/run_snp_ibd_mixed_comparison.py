@@ -2,10 +2,15 @@
 Compare three models using synchronized block bootstrap:
   1. IBD-only   (ibd_model_Nfixed.stan, effective_N as parameter)
   2. SNP-only   (snp_model_Nfixed.stan, effective_N fixed at 6000)
-  3. Mixed       (mixed_model.stan, effective_N as parameter)
+  3. Mixed       (mixed_model_Nfixed.stan, effective_N as parameter)
 
 Same genomic blocks are selected for both IBD and SNP resampling.
 """
+
+import sys, os
+_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _PARENT)
+_MODELS = os.path.join(_PARENT, "models")
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -150,9 +155,9 @@ print(f"\nTotal pool: {total_blocks} blocks of {BLOCK_SIZE_CM} cM "
 # ====================================================================
 # 3. Compile Stan models
 # ====================================================================
-ibd_model = CmdStanModel(stan_file="ibd_model_Nfixed.stan")
-snp_model = CmdStanModel(stan_file="snp_model_Nfixed.stan")
-mixed_model = CmdStanModel(stan_file="mixed_model.stan")
+ibd_model = CmdStanModel(stan_file=os.path.join(_MODELS, "ibd_model_Nfixed.stan"))
+snp_model = CmdStanModel(stan_file=os.path.join(_MODELS, "snp_model_Nfixed.stan"))
+mixed_model = CmdStanModel(stan_file=os.path.join(_MODELS, "mixed_model_Nfixed.stan"))
 
 # ====================================================================
 # 4. Run replicates
