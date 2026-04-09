@@ -76,8 +76,6 @@ parameters {
     vector<lower=1>[n_events] times;
     array[n_admixture] real<lower=0, upper=1> admixture_fractions;
     vector<lower=100>[n_nodes] Ne;
-    real<lower=0> N_0;
-    real<lower=0> sigma_Ne;
     real<lower=0> kappa_snp;
 }
 
@@ -229,9 +227,7 @@ model {
     // ---- Priors ----
     times ~ exponential(0.01);
     admixture_fractions ~ uniform(0, 1);
-    N_0 ~ normal(10000, 1000);
-    sigma_Ne ~ exponential(1.0 / 2700);
-    Ne ~ normal(N_0, sigma_Ne);
+    Ne ~ gamma(2, 0.0002);
     kappa_snp ~ exponential(1);
 
     // ---- IBD likelihood ----

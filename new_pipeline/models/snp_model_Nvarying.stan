@@ -26,8 +26,6 @@ parameters {
     vector<lower=1>[n_events] times;
     array[n_admixture] real<lower=0, upper=1> admixture_fractions;
     vector<lower=100>[n_nodes] Ne;
-    real<lower=0> N_0;
-    real<lower=0> sigma_Ne;
 }
 
 transformed parameters {
@@ -117,9 +115,7 @@ transformed parameters {
 model {
     times ~ exponential(1.0 / 100);
     admixture_fractions ~ uniform(0, 1);
-    N_0 ~ normal(10000, 1000);
-    sigma_Ne ~ exponential(1.0 / 2700);
-    Ne ~ normal(N_0, sigma_Ne);
+    Ne ~ gamma(2, 0.0002);
 
     for (i in 1:n_leaves) {
         for (j in i:n_leaves) {
