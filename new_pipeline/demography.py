@@ -132,8 +132,8 @@ class DemographicTopology:
         self.nodes[parent_1_name] = p1
         self.nodes[parent_2_name] = p2
 
-        # Record Event
-        event_id = len(self.ordered_events) 
+        # Record Event (1-indexed to match MERGE numbering)
+        event_id = len(self.ordered_events) + 1
         self.ordered_events.append({
             'id': event_id,
             'type': 'ADMIXTURE',
@@ -301,24 +301,44 @@ class DemographicTopology:
         for i, name in enumerate(self.initial_leaves):
             node_x[name] = float(i)
 
-        # Process events to assign X to ancestors
-        for event in self.ordered_events:
+        def _find_first_merge_partner(pop, start_idx):
+            """Walk the event list from start_idx forward; return the
+            partner pop in pop's first MERGE, or None if pop is absorbed
+            by another ADMIX first."""
+            for ev in self.ordered_events[start_idx:]:
+                if ev['type'] == 'MERGE' and pop in ev['children']:
+                    others = [c for c in ev['children'] if c != pop]
+                    return others[0] if others else None
+                if ev['type'] == 'ADMIXTURE' and ev['child'] == pop:
+                    return None
+            return None
+
+        # Process events to assign X to ancestors. Both rules are
+        # MIDPOINT-OF-PARTNERS:
+        #   MERGE   parent -> midpoint(child_1, child_2)
+        #   ADMIX   parent -> midpoint(admix_child, eventual_merge_partner)
+        # An ADMIX output that gets absorbed by another ADMIX (no
+        # merge partner) uses a small fallback offset from its child.
+        for event_idx, event in enumerate(self.ordered_events):
             if event['type'] == 'MERGE':
                 c1, c2 = event['children']
                 parent = event['parent']
                 if c1 in node_x and c2 in node_x:
                     node_x[parent] = (node_x[c1] + node_x[c2]) / 2.0
                 else:
-                    node_x[parent] = 0.0 
+                    node_x[parent] = 0.0
 
             elif event['type'] == 'ADMIXTURE':
                 child = event['child']
                 p1, p2 = event['parents']
                 if child in node_x:
                     base_x = node_x[child]
-                    offset = 0.5
-                    node_x[p1] = base_x - offset
-                    node_x[p2] = base_x + offset
+                    for p, default_sign in [(p1, -1), (p2, +1)]:
+                        partner = _find_first_merge_partner(p, event_idx + 1)
+                        if partner is not None and partner in node_x:
+                            node_x[p] = (base_x + node_x[partner]) / 2.0
+                        else:
+                            node_x[p] = base_x + default_sign * 0.3
 
         # =========================================================
         # 3. Drawing
