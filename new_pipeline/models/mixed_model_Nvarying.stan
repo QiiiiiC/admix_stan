@@ -75,7 +75,7 @@ data {
 parameters {
     vector<lower=1>[n_events] times;
     array[n_admixture] real<lower=0, upper=1> admixture_fractions;
-    vector<lower=100>[n_nodes] Ne;
+    vector<lower=1000>[n_nodes] Ne;
     real<lower=0> kappa_snp;
 }
 

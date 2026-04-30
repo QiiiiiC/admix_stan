@@ -317,6 +317,9 @@ class DemographicTopology:
         # MIDPOINT-OF-PARTNERS:
         #   MERGE   parent -> midpoint(child_1, child_2)
         #   ADMIX   parent -> midpoint(admix_child, eventual_merge_partner)
+        # Special case: if the two ADMIX parents merge with each other
+        # (a symmetric "loop"), place them symmetrically around the
+        # child so the child sits on the midpoint.
         # An ADMIX output that gets absorbed by another ADMIX (no
         # merge partner) uses a small fallback offset from its child.
         for event_idx, event in enumerate(self.ordered_events):
@@ -333,12 +336,19 @@ class DemographicTopology:
                 p1, p2 = event['parents']
                 if child in node_x:
                     base_x = node_x[child]
-                    for p, default_sign in [(p1, -1), (p2, +1)]:
-                        partner = _find_first_merge_partner(p, event_idx + 1)
-                        if partner is not None and partner in node_x:
-                            node_x[p] = (base_x + node_x[partner]) / 2.0
-                        else:
-                            node_x[p] = base_x + default_sign * 0.3
+                    partner1 = _find_first_merge_partner(p1, event_idx + 1)
+                    partner2 = _find_first_merge_partner(p2, event_idx + 1)
+
+                    if partner1 == p2 and partner2 == p1:
+                        node_x[p1] = base_x - 0.3
+                        node_x[p2] = base_x + 0.3
+                    else:
+                        for p, partner, default_sign in [(p1, partner1, -1),
+                                                         (p2, partner2, +1)]:
+                            if partner is not None and partner in node_x:
+                                node_x[p] = (base_x + node_x[partner]) / 2.0
+                            else:
+                                node_x[p] = base_x + default_sign * 0.3
 
         # =========================================================
         # 3. Drawing
