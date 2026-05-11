@@ -138,25 +138,23 @@ SIM_SEQ_LEN = SIM_CM_EACH / CM_PER_UNIT
 cm_values = [50, 100, 150, 200, 300, 500, 750, 1000]
 
 bins = [
-    [0.2, 0.25], [0.25, 0.3], [0.3, 0.35], [0.35, 0.4],
-    [0.4, 0.45], [0.45, 0.5],
     [0.5, 0.55], [0.55, 0.6], [0.6, 0.65], [0.65, 0.7],
     [0.7, 0.8], [0.8, 0.9], [0.9, 1.0],
-    [1.0, 1.5], [1.5, 2.0], [2.0, 5.0], [5.0, 8.0],
-    [8.0, 20.0], [20.0, BLOCK_SIZE_CM]
+    [1.0, 1.25],[1.25,1.5], [1.5, 2.0], [2.0, 3.0],[3.0,4.0],[4.0,5.0],[5.0, 7.5],
+    [7.5, 12.0],[12.0,20.0], [20.0, BLOCK_SIZE_CM]
 ]
 
 # --- Population sizes (haploid; demography API takes diploid = haploid//2) ---
 NE_BASE   = 10000   # most internal branches and b-leaf
 NE_A_LEAF = 10000    
 NE_LOOP   = 5000    
-NE_BP     = 10000   # bP edge (large to minimize F2 distortion)
-NE_C_LEAF = 10000    # c leaf branch (drift amplifier for ancient admix)
+NE_BP     = 10000   
+NE_C_LEAF = 10000    
 
 # --- Recent admix on a (through b) ---
-T_LOOP_SPLIT  = 5     # t0: a admixes into aP1, aP2
-T_APB_MERGE   = 95    # t1: aP2 + b -> bP
-T_LOOP_CLOSE  = 100   # t2: bP + aP1 -> ab          ⇒  Δt3 = 5
+T_LOOP_SPLIT  = 10
+T_APB_MERGE   = 95
+T_LOOP_CLOSE  = 125
 ALPHA_LOOP    = 0.5
 
 # --- Ancient admix on c ---
@@ -389,7 +387,9 @@ for cm_val in cm_values:
 
                 init = {
                     "times": [100.0] * n_events_t,
-                    "Ne": [10000.0] * n_nodes_t,
+                    "mu_log_Ne": np.log(10000.0),
+                    "sigma_log_Ne": 0.2,
+                    "z_Ne": [0.0] * n_nodes_t,
                 }
                 if n_admix_t > 0:
                     init["admixture_fractions"] = [0.5] * n_admix_t

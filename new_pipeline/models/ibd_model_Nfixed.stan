@@ -213,7 +213,7 @@ transformed parameters {
 
 model {
     times ~ exponential(0.01);
-    admixture_fractions ~ uniform(0, 1);
+    admixture_fractions ~ beta(1, 1);
     effective_N ~ normal(10000, 3000) T[1000, 20000];
 
     for (i in 1:n_leaves) {

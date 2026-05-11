@@ -25,10 +25,17 @@ data {
 parameters {
     vector<lower=1>[n_events] times;
     array[n_admixture] real<lower=0, upper=1> admixture_fractions;
-    vector<lower=1000>[n_nodes] Ne;
+    real mu_log_Ne;
+    real<lower=0> sigma_log_Ne;
+    vector[n_nodes] z_Ne;
 }
 
 transformed parameters {
+    vector<lower=0>[n_nodes] Ne;
+
+    for (a in 1:n_nodes) {
+        Ne[a] = exp(mu_log_Ne + sigma_log_Ne * z_Ne[a]);
+    }
     vector[n_events] cumulative_times = cumulative_sum(times);
     matrix[n_nodes, n_nodes] I = diag_matrix(rep_vector(1.0, n_nodes));
 
@@ -113,9 +120,11 @@ transformed parameters {
 }
 
 model {
-    times ~ exponential(1.0 / 100);
-    admixture_fractions ~ uniform(0, 1);
-    Ne ~ gamma(2, 0.0002);
+    times ~ exponential(0.01);
+    admixture_fractions ~ beta(1.0, 1.0);
+    mu_log_Ne ~ normal(log(10000), 1.0);
+    sigma_log_Ne ~ exponential(1.0);
+    z_Ne ~ normal(0, 1.0);
 
     for (i in 1:n_leaves) {
         for (j in i:n_leaves) {
