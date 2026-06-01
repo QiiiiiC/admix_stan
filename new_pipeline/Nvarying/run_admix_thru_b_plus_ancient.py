@@ -347,6 +347,10 @@ admix_params = {
     label: {ti: {cm: [] for cm in cm_values} for ti in range(n_topos)}
     for label in model_labels
 }
+ne_params = {
+    label: {cm: [] for cm in cm_values}
+    for label in model_labels
+}
 
 rng = np.random.default_rng(seed=2025)
 
@@ -421,6 +425,22 @@ for cm_val in cm_values:
                     all_vars = fit.stan_variables()
                     cum_t = all_vars['cumulative_times']
                     admix_f = all_vars.get('admixture_fractions', None)
+                    mu_log_ne = all_vars.get('mu_log_Ne', None)
+                    sigma_log_ne = all_vars.get('sigma_log_Ne', None)
+                    
+                    # Store Ne parameters
+                    if mu_log_ne is not None and sigma_log_ne is not None:
+                        if mu_log_ne.ndim > 0:
+                            ne_params[m_label][cm_val].append({
+                                'mu_log_Ne': mu_log_ne.mean(),
+                                'sigma_log_Ne': sigma_log_ne.mean()
+                            })
+                        else:
+                            ne_params[m_label][cm_val].append({
+                                'mu_log_Ne': float(mu_log_ne),
+                                'sigma_log_Ne': float(sigma_log_ne)
+                            })
+                    
                     pdict = {}
                     for child, ct_idx, af_idx in admix_mappings[ti]:
                         pdict[f'{child}_time'] = cum_t[:, ct_idx].mean()
@@ -650,6 +670,64 @@ fig2.tight_layout(rect=[0, 0, 1, 0.96])
 fig2.savefig("admix_thru_b_plus_ancient_params.png", dpi=200, bbox_inches="tight")
 plt.show()
 print("Saved: admix_thru_b_plus_ancient_params.png")
+
+
+# ====================================================================
+# 6b. Plot 2: Ne parameters (mu_log_Ne and sigma_log_Ne) across cM values
+# ====================================================================
+fig3, axes3 = plt.subplots(1, 2, figsize=(16, 6))
+
+# Plot mu_log_Ne
+ax_mu = axes3[0]
+for m_idx, m_label in enumerate(model_labels):
+    mu_values = []
+    mu_stds = []
+    for cm_val in cm_values:
+        if len(ne_params[m_label][cm_val]) > 0:
+            mus = np.array([x['mu_log_Ne'] for x in ne_params[m_label][cm_val]])
+            mu_values.append(mus.mean())
+            mu_stds.append(mus.std() / np.sqrt(len(mus)))
+        else:
+            mu_values.append(np.nan)
+            mu_stds.append(0)
+    
+    ax_mu.errorbar(cm_values, mu_values, yerr=mu_stds, 
+                   marker='o', label=m_label, linewidth=2, markersize=8)
+
+ax_mu.axhline(np.log(10000), color='red', ls='--', linewidth=2, label='True log(Ne)=log(10000)')
+ax_mu.set_xlabel("Genome length (cM)", fontsize=12)
+ax_mu.set_ylabel("μ_log(Ne)", fontsize=12)
+ax_mu.set_title("Mean log(Ne) across genome lengths", fontsize=13, fontweight="bold")
+ax_mu.legend(fontsize=10)
+ax_mu.grid(True, alpha=0.3)
+
+# Plot sigma_log_Ne
+ax_sigma = axes3[1]
+for m_idx, m_label in enumerate(model_labels):
+    sigma_values = []
+    sigma_stds = []
+    for cm_val in cm_values:
+        if len(ne_params[m_label][cm_val]) > 0:
+            sigmas = np.array([x['sigma_log_Ne'] for x in ne_params[m_label][cm_val]])
+            sigma_values.append(sigmas.mean())
+            sigma_stds.append(sigmas.std() / np.sqrt(len(sigmas)))
+        else:
+            sigma_values.append(np.nan)
+            sigma_stds.append(0)
+    
+    ax_sigma.errorbar(cm_values, sigma_values, yerr=sigma_stds,
+                      marker='s', label=m_label, linewidth=2, markersize=8)
+
+ax_sigma.set_xlabel("Genome length (cM)", fontsize=12)
+ax_sigma.set_ylabel("σ_log(Ne)", fontsize=12)
+ax_sigma.set_title("Heterogeneity in log(Ne) across genome lengths", fontsize=13, fontweight="bold")
+ax_sigma.legend(fontsize=10)
+ax_sigma.grid(True, alpha=0.3)
+
+fig3.tight_layout()
+fig3.savefig("ne_parameters_convergence.png", dpi=200, bbox_inches="tight")
+plt.show()
+print("Saved: ne_parameters_convergence.png")
 
 
 # ====================================================================

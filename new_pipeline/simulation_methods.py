@@ -124,7 +124,7 @@ def simulate_msprime(
     )
     
     # Simulate Mutations
-    mts = msprime.sim_mutations(ts, rate=mutation_rate, random_seed=seed, discrete_genome=False)
+    mts = msprime.sim_mutations(ts, rate=mutation_rate, random_seed=seed, discrete_genome=True)
     
     return mts
 

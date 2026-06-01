@@ -89,11 +89,11 @@ def get_merge_event_index(dem, parent_name):
 # ====================================================================
 # 0. Configuration
 # ====================================================================
-N_REPLICATES = 100
-BLOCK_SIZE_CM = 50.0
-CM_PER_UNIT = 1e-4
-RECOMB_RATE = 1e-6
-MUT_RATE = 1e-6
+N_REPLICATES   = 100
+BLOCK_SIZE_CM  = 50.0
+CM_PER_UNIT    = 1e-6       # 1 cM per Mb (standard human)
+RECOMB_RATE    = 1e-8       # crossovers/bp/generation
+MUT_RATE       = 1.25e-8    # mutations/bp/generation
 SAMPLES_PER_POP = {'a': 15, 'b': 15, 'c': 15, 'd': 15}
 
 N_SIMS = 50
@@ -103,9 +103,11 @@ SIM_SEQ_LEN = SIM_CM_EACH / CM_PER_UNIT
 cm_values = [50, 100, 150, 200, 300, 500, 750, 1000]
 
 bins = [
-    [0.5, 0.55], [0.55, 0.6], [0.6, 0.65], [0.65, 0.7],
-    [0.7, 0.8], [0.8, 0.9], [0.9, 1.0],
-    [1.0, 1.25],[1.25,1.5], [1.5, 2.0], [2.0, 3.0],[3.0,4.0],[4.0,5.0],[5.0, 7.5],
+    # [0.5, 0.55], [0.55, 0.6], [0.6, 0.65], [0.65, 0.7],
+    # [0.7, 0.8], [0.8, 0.9], [0.9, 1.0],
+    # [1.0, 1.25],[1.25,1.5], 
+    [1.5, 1.75],[1.75,2.0], [2.0, 2.5],[2.5,3.0],
+    [3.0,4.0],[4.0,5.0],[5.0, 6.0],[6.0,7.5],
     [7.5, 12.0],[12.0,20.0], [20.0, BLOCK_SIZE_CM]
 ]
 
@@ -114,18 +116,18 @@ NE_UNIFORM = 10000
 
 # --- Recent admix on a (through b) ---
 T_LOOP_SPLIT  = 10
-T_APB_MERGE   = 95
-T_LOOP_CLOSE  = 125
+T_APB_MERGE   = 55
+T_LOOP_CLOSE  = 75
 ALPHA_LOOP    = 0.5
 
 # --- Ancient admix on c ---
-T_OLD = 900
+T_OLD = 500
 F_OLD = 0.70
 
 # --- Other event times ---
-T_LEFT_MERGE  = 1100
-T_RIGHT_MERGE = 1300
-T_ROOT        = 1500
+T_LEFT_MERGE  = 700
+T_RIGHT_MERGE = 900
+T_ROOT        = 1000
 
 SNP_CUTOFF_TIME = T_ROOT
 SNP_MIN_MAF = 0.05

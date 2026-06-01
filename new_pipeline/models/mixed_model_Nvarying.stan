@@ -235,8 +235,8 @@ model {
     // ---- Priors ----
     times ~ exponential(0.01);
     admixture_fractions ~ beta(1.0, 1.0);
-    mu_log_Ne ~ normal(log(10000), 1.0);
-    sigma_log_Ne ~ exponential(1.0);
+    mu_log_Ne ~ normal(log(10000), 0.2);
+    sigma_log_Ne ~ exponential(0.2);
     z_Ne ~ normal(0, 1.0);
     kappa_snp ~ exponential(1.0);
 
