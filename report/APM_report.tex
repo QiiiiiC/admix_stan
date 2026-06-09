@@ -90,7 +90,143 @@
 
 \begin{document}
 \maketitle
-\section{Inference via Identity by Descent(IBD segment)}
+
+\setcounter{section}{-1}
+\section{Project Overview, Timeline, and Thesis Outline}\label{sec:overview}
+
+\subsection{Overview}
+The thesis develops statistical methods for reconstructing \emph{admixture
+graphs} --- demographic histories in which populations not only split but also
+mix --- from genetic data, and applies them to human population history.
+
+The core methodological problem is that the two most informative kinds of genetic
+signal speak to different time depths. \emph{Identity-by-descent (IBD) segments}
+are long stretches of genome co-inherited from a recent common ancestor; their
+length distribution is sharply informative about \emph{recent} demographic events
+but is erased by recombination at greater depths. \emph{Single-nucleotide
+polymorphism (SNP) allele frequencies}, summarized through their cross-population
+covariance ($f$-statistics), carry the complementary signal of \emph{ancient}
+shared drift. The central idea of the thesis is to combine the two in a single
+\emph{composite likelihood} for the admixture graph: an analytic expectation of
+IBD sharing as a function of the graph (derived here via a matrix recursion over
+epochs), a TreeMix-style model for the SNP covariance, and a shared parameter
+vector (event times, admixture fractions, effective sizes) fitted by Bayesian
+variational inference. Candidate graph topologies are compared as competing
+models through their evidence (ELBO), turning topology choice into a question of
+statistical model selection.
+
+The work proceeds in three stages of increasing ambition. The first builds and
+validates the composite-likelihood framework for a \emph{given} topology. The
+second tackles the combinatorially large space of admixture graphs directly: an
+efficient graph search (using TreeMix, or an alternative, to initialize the
+placement of admixture events) together with topology selection cast as
+statistical hypothesis testing and as the combination of subgraphs inferred on
+subsets of populations. The third turns to \emph{application}: integrating the
+genetic admixture-graph inferences with \emph{linguistic} data, relating the
+history of populations to the history of their languages.
+
+\subsection{PhD Timeline}
+\Cref{tab:timeline} summarizes the planned timeline and the current status of each
+phase. The first phase --- the methodological framework that is the subject of
+\crefrange{sec:ibd}{sec:simstudy} of this report --- is complete and validated on
+simulated data; the graph-search phase is under way; the linguistic-application
+phase is planned for the remainder of the PhD.
+
+\begin{table}[!htbp]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{p{3.0cm} p{8.5cm} p{1.6cm} l}
+\toprule
+\textbf{Period} & \textbf{Activity / deliverable} & \textbf{Thesis part} & \textbf{Status} \\
+\midrule
+Jun--Jul 2025 &
+Analysis of real data and write-up of the first paper: the composite IBD\,+\,SNP
+inference framework for a given admixture graph (no efficient graph search). &
+Part I &
+\textcolor{codegreen}{\textbf{Completed}} \\
+Aug--Nov 2025 &
+A new (or extended) dataset with more populations; optimization via graph search
+--- TreeMix (or another method) as an initialization for admixture placement,
+followed by topology selection as statistical testing / combination of subgraphs
+on sub-populations. &
+Part II &
+\textcolor{orange}{\textbf{In progress}} \\
+Late 2025 -- end of PhD &
+Integration with linguistic data; broader applications relating genetic and
+language history. &
+Part III &
+\textcolor{red}{\textbf{Planned}} \\
+\bottomrule
+\end{tabular}
+\caption{PhD timeline and status of each phase.}\label{tab:timeline}
+\end{table}
+
+\subsection{Thesis Outline}
+The thesis is organized into three parts, mirroring the timeline. Below, each
+part is broken down into its components with the current status indicated as
+\textcolor{codegreen}{\textbf{[done]}},
+\textcolor{orange}{\textbf{[in progress]}}, or
+\textcolor{red}{\textbf{[planned]}}.
+
+\paragraph{Part I --- A composite-likelihood framework for admixture-graph
+inference from IBD and SNP data, for a given topology.}
+This part corresponds to \crefrange{sec:ibd}{sec:simstudy} of the present report.
+\begin{compactitem}
+  \item \textcolor{codegreen}{\textbf{[done]}} Analytic expectation of IBD
+  segment sharing under an admixture graph: the per-epoch contribution
+  $f(t_1,t_2,N,u,v)$ and its accumulation by a matrix recursion over an arbitrary
+  topology (\cref{sec:algorithm}).
+  \item \textcolor{codegreen}{\textbf{[done]}} Zero-observation (Poisson)
+  adjustment for empty length bins (\cref{sec:zero}), and block-bootstrap with a
+  delete-one-haplotype jackknife for the IBD variance (\cref{sec:estimation}).
+  \item \textcolor{codegreen}{\textbf{[done]}} SNP allele-frequency covariance
+  model (Brownian drift + linear admixture, double-centered TreeMix estimator)
+  (\cref{sec:snp}).
+  \item \textcolor{codegreen}{\textbf{[done]}} Composite IBD\,+\,SNP likelihood,
+  Bayesian inference via Pathfinder variational inference, and topology selection
+  through the ELBO (\cref{sec:framework}).
+  \item \textcolor{codegreen}{\textbf{[done]}} Simulation validation: parameter
+  recovery under uniform and varying effective sizes; the recent-vs-ancient
+  division of labor between IBD and SNP; Pathfinder-vs-HMC bias and efficiency;
+  and robustness to estimated (Hap-IBD) rather than true segments
+  (\cref{sec:simstudy}).
+  \item \textcolor{orange}{\textbf{[in progress]}} Application to a real dataset
+  and write-up as the first paper.
+\end{compactitem}
+
+\paragraph{Part II --- Scaling to many populations: efficient admixture-graph
+search and topology selection as statistical testing.}
+\begin{compactitem}
+  \item \textcolor{orange}{\textbf{[in progress]}} Assembling a larger
+  multi-population dataset (a new dataset, or the existing one extended with more
+  populations).
+  
+  \item \textcolor{codegreen}{\textbf{[done]}} Topology selection framed as
+  statistical hypothesis testing (is an extra admixture edge supported by the
+  data?), building on the ELBO-based model comparison of Part~I.
+  \item \textcolor{red}{\textbf{[in progress]}} An efficient search over the space of
+  admixture graphs, using TreeMix (or an alternative) to initialize the number
+  and placement of admixture events rather than enumerating topologies blindly.
+  \item \textcolor{red}{\textbf{[in progress]}} Combining subgraphs inferred on
+  subsets of populations into a coherent global admixture graph, to keep the
+  search tractable as the number of populations grows.
+  \item \textcolor{red}{\textbf{[planned]}} Validation on simulations and
+  application; write-up as the second paper.
+\end{compactitem}
+
+\paragraph{Part III --- Integrating genetic and linguistic data.}
+\begin{compactitem}
+  \item \textcolor{red}{\textbf{[planned]}} Curation of linguistic data
+  (phylogenies and/or contact/borrowing information) aligned to the genetic
+  populations.
+  \item \textcolor{red}{\textbf{[planned]}} Joint or comparative analysis of the
+  inferred genetic admixture graphs against language history, testing where
+  genetic and linguistic signals of contact agree or diverge.
+  \item \textcolor{red}{\textbf{[planned]}} Case-study applications and final
+  write-up.
+\end{compactitem}
+
+\section{Inference via Identity by Descent(IBD segment)}\label{sec:ibd}
 We will use the average fraction of the genome shared through Identity by Descent(IBD) segments of length between $u$ centiMorgans and  $v$ centiMorgans. Here, $u$ and $v$ are given. The explicit formula for the expectation of the above statistics is as follows. \begin{equation}\label{eq:expectation_fraction}
     \mathbb{E}_{[u,v]}[f|\theta] =\frac{1}{|I|}\sum_{i\in I}\mathbb{E}[\mathbbm{1}\{u\leq l_i\leq v\}|\theta]= \frac{1}{|I|}\sum_{i\in I}p(u\leq l_i\leq v|
 \theta) = p(u\leq L\leq v|\theta)
