@@ -25,6 +25,7 @@ from ibd_jackknife import (
 )
 from demography import DemographicTopology
 from cmdstanpy import CmdStanModel
+from relative_error import plot_relative_error_boxplot
 
 
 # ====================================================================
@@ -36,6 +37,8 @@ CM_PER_UNIT = 1e-4
 RECOMB_RATE = 1e-6
 MUT_RATE = 1e-6
 SAMPLES_PER_POP = {'a': 15, 'b': 15, 'c': 15, 'admix': 15}
+# Haploid sample count per population (diploid samples x ploidy 2)
+N_HAPLOID_PER_POP = {_p: 2 * _c for _p, _c in SAMPLES_PER_POP.items()}
 
 N_SIMS = 5
 SIM_CM_EACH = 500
@@ -121,6 +124,11 @@ times_pf = {cm_val: [] for cm_val in cm_values}
 
 rng = np.random.default_rng(seed=2025)
 
+# Collector for parameter relative-error box plot (primary = MCMC fit,
+# largest cm setting only)
+rel_err_stanvars = []
+REL_ERR_CM = cm_values[-1]
+
 for cm_val in cm_values:
     print(f"\n{'='*60}")
     print(f"  cm = {cm_val} cM  ({N_REPLICATES} replicates)")
@@ -142,7 +150,7 @@ for cm_val in cm_values:
         )
 
         stan_ibd = build_ibd_stan_data(
-            dem, ibd_mean, ibd_var, bins,
+            dem, ibd_mean, ibd_var, bins, n_samples_per_pop=N_HAPLOID_PER_POP,
             T_max=100000, cm=cm_val,
         )
 
@@ -173,6 +181,8 @@ for cm_val in cm_values:
             }
             results_mcmc[cm_val].append(pmeans)
             times_mcmc[cm_val].append(elapsed_mcmc)
+            if cm_val == REL_ERR_CM:
+                rel_err_stanvars.append(all_vars)
 
         except Exception as e:
             print(f"    [WARN] MCMC rep {rep+1} failed: {e}")
@@ -305,6 +315,13 @@ plt.tight_layout()
 plt.savefig("bias_efficiency_comparison.png", dpi=200, bbox_inches="tight")
 plt.show()
 print("Saved: bias_efficiency_comparison.png")
+
+# Parameter relative error (glike-style box plot)
+plot_relative_error_boxplot(
+    dem, rel_err_stanvars, varying=False,
+    outpath="bias_efficiency_comparison_relative_error_Nfixed.png",
+    title="Parameter relative error (IBD, true topology)",
+)
 
 # ====================================================================
 # 7. Print summary table

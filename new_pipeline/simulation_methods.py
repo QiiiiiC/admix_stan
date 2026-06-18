@@ -496,11 +496,52 @@ def calculate_ibd_fractions_mrca(ts, bins, cm_per_unit=1e-6, num_bootstraps=1000
     return final_mean_matrix, final_var_matrix
 
 
+def _resolve_n_samples(dem, n_samples_per_pop):
+    """Resolve per-population haploid sample counts into a list ordered to
+    match the IBD/SNP matrix rows (i.e. dem.initial_leaves order).
+
+    The IBD zero-segment likelihood normalises by the number of sample pairs,
+    which depends on the number of haploid samples in each population:
+    within a population (i == j) there are n*(n-1)/2 pairs, and between two
+    populations (i != j) there are n_i * n_j pairs.
+
+    Parameters
+    ----------
+    n_samples_per_pop : int | dict | sequence
+        Number of *haploid* samples per population. Accepts
+          - dict {leaf_name: count}  (looked up by dem.initial_leaves),
+          - int                      (same count for every population), or
+          - sequence of length n_leaves (already in leaf order).
+    """
+    leaves = dem.initial_leaves
+    n_leaves = len(leaves)
+
+    if n_samples_per_pop is None:
+        raise ValueError(
+            "n_samples_per_pop must be provided (haploid sample count per "
+            "population) so the IBD pair counts reflect the actual sample sizes."
+        )
+
+    if isinstance(n_samples_per_pop, dict):
+        return [int(n_samples_per_pop[p]) for p in leaves]
+    if np.isscalar(n_samples_per_pop):
+        return [int(n_samples_per_pop)] * n_leaves
+
+    seq = [int(x) for x in n_samples_per_pop]
+    if len(seq) != n_leaves:
+        raise ValueError(
+            f"n_samples_per_pop has length {len(seq)} but the topology has "
+            f"{n_leaves} leaves."
+        )
+    return seq
+
+
 def build_ibd_stan_data(
     dem,
     ibd_mean: dict,
     ibd_var: dict,
     bins: list,
+    n_samples_per_pop=None,
     T_max: float = None,
     se_floor: float = 1e-8,
     cm: float = None
@@ -605,6 +646,9 @@ def build_ibd_stan_data(
     ibd_data['pair_i'] = pair_i_list
     ibd_data['pair_j'] = pair_j_list
 
+    # Haploid sample count per population, for the IBD zero-segment pair counts
+    ibd_data['n_samples'] = _resolve_n_samples(dem, n_samples_per_pop)
+
     # ------------------------------------------------------------------
     # 5. IBD observations: ibd_hat and ibd_se
     # ------------------------------------------------------------------
@@ -638,6 +682,7 @@ def build_ibd_stan_data(
     print(f"  n_nodes      : {n_nodes}")
     print(f"  n_events     : {n_events}")
     print(f"  n_admixture  : {ibd_data['n_admixture']}")
+    print(f"  n_samples    : {ibd_data['n_samples']}")
     print(f"  n_leaf_pairs : {n_leaf_pairs}")
     print(f"  n_bins       : {n_bins}")
     print(f"  T_max        : {T_max:.0f} generations")
@@ -651,7 +696,6 @@ def build_snp_stan_data(
     dem,
     w_hat: np.ndarray,
     w_se: np.ndarray,
-    effective_N: float,
 ) -> dict:
     """
     Build a Stan data dictionary for snp_model_Nfixed.stan.
@@ -663,8 +707,6 @@ def build_snp_stan_data(
         Observed double-centered SNP covariance matrix.
     w_se : np.ndarray (n_leaves, n_leaves)
         Standard errors for w_hat entries.
-    effective_N : float
-        Haploid effective population size (fixed, passed as data).
 
     Returns
     -------
@@ -713,9 +755,6 @@ def build_snp_stan_data(
     data['pair_i'] = pair_i_list
     data['pair_j'] = pair_j_list
 
-    # -- Fixed N --
-    data['effective_N'] = effective_N
-
     # -- Observations --
     assert w_hat.shape == (n_leaves, n_leaves), \
         f"w_hat shape {w_hat.shape} != ({n_leaves},{n_leaves})"
@@ -727,7 +766,6 @@ def build_snp_stan_data(
     print(f"  n_nodes      : {n_nodes}")
     print(f"  n_events     : {n_events}")
     print(f"  n_leaf_pairs : {data['n_leaf_pairs']}")
-    print(f"  effective_N  : {effective_N}")
     print(f"  w_hat range  : [{w_hat.min():.3e}, {w_hat.max():.3e}]")
     print(f"  w_se  range  : [{w_se.min():.3e}, {w_se.max():.3e}]")
 
@@ -741,6 +779,7 @@ def build_mixed_stan_data(
     bins: list,
     w_hat: np.ndarray,
     w_se: np.ndarray,
+    n_samples_per_pop=None,
     T_max: float = None,
     se_floor: float = 1e-8,
     cm: float = None,
@@ -815,6 +854,9 @@ def build_mixed_stan_data(
     data['pair_i'] = pair_i_list
     data['pair_j'] = pair_j_list
 
+    # Haploid sample count per population, for the IBD zero-segment pair counts
+    data['n_samples'] = _resolve_n_samples(dem, n_samples_per_pop)
+
     # -- IBD-specific data --
     data['T_max'] = T_max
 
@@ -846,6 +888,7 @@ def build_mixed_stan_data(
     # -- Summary --
     print(f"[build_mixed_stan_data] Stan data assembled (IBD + SNP composite):")
     print(f"  n_leaves     : {n_leaves}")
+    print(f"  n_samples    : {data['n_samples']}")
     print(f"  n_nodes      : {n_nodes}")
     print(f"  n_events     : {n_events}")
     print(f"  n_leaf_pairs : {data['n_leaf_pairs']}")

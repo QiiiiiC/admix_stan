@@ -43,6 +43,7 @@ from ibd_jackknife import (
 )
 from demography import DemographicTopology
 from cmdstanpy import CmdStanModel
+from relative_error import plot_relative_error_boxplot
 
 
 def extract_elbo(fit):
@@ -78,6 +79,8 @@ CM_PER_UNIT = 1e-4
 RECOMB_RATE = 1e-6
 MUT_RATE = 1e-6
 SAMPLES_PER_POP = {'a': 15, 'b': 15, 'c': 15, 'admix': 15}
+# Haploid sample count per population (diploid samples x ploidy 2)
+N_HAPLOID_PER_POP = {_p: 2 * _c for _p, _c in SAMPLES_PER_POP.items()}
 
 N_SIMS = 50
 SIM_CM_EACH = 50
@@ -92,7 +95,6 @@ bins = [
 
 SNP_CUTOFF_TIME = 1500
 SNP_MIN_MAF = 0.05
-FIXED_NE = 6000
 
 
 # ====================================================================
@@ -215,6 +217,10 @@ model_colors = ["#378ADD", "#4CAF50", "#E8A838"]
 # Only stores replicates where ALL 3 topologies succeeded for that model type
 elbo_all = {mt: {cm: [] for cm in cm_values} for mt in model_types}
 
+# Relative-error collector: Mixed model, true topology (ti==0), largest cm only
+rel_err_stanvars = []
+REL_ERR_CM = cm_values[-1]
+
 rng = np.random.default_rng(seed=2025)
 _devnull = open(os.devnull, 'w')  # suppress verbose build output
 
@@ -267,7 +273,7 @@ for cm_val in cm_values:
             try:
                 with redirect_stdout(_devnull):
                     sd = build_ibd_stan_data(
-                        dem_infer, ibd_mean, ibd_var, bins,
+                        dem_infer, ibd_mean, ibd_var, bins, n_samples_per_pop=N_HAPLOID_PER_POP,
                         T_max=100000, cm=cm_val,
                     )
                 init = {**init_base, "effective_N": 10000.0}
@@ -283,10 +289,13 @@ for cm_val in cm_values:
             try:
                 with redirect_stdout(_devnull):
                     sd = build_snp_stan_data(
-                        dem_infer, w_hat, w_se, effective_N=FIXED_NE,
+                        dem_infer, w_hat, w_se,
                     )
+                # SNP-only Nfixed has effective_N as a parameter; init it near the
+                # truth or Pathfinder fails from its random start.
+                init = {**init_base, "effective_N": 10000.0}
                 fit = snp_stan.pathfinder(
-                    data=sd, inits=init_base, show_console=False, psis_resample=True,
+                    data=sd, inits=init, show_console=False, psis_resample=True,
                 )
                 rep_elbos["snp"][ti] = extract_elbo(fit)
             except Exception as e:
@@ -297,7 +306,7 @@ for cm_val in cm_values:
             try:
                 with redirect_stdout(_devnull):
                     sd = build_mixed_stan_data(
-                        dem_infer, ibd_mean, ibd_var, bins, w_hat, w_se,
+                        dem_infer, ibd_mean, ibd_var, bins, w_hat, w_se, n_samples_per_pop=N_HAPLOID_PER_POP,
                         T_max=100000, cm=cm_val,
                     )
                 init = {**init_base, "effective_N": 10000.0, "kappa_snp": 1.0}
@@ -305,6 +314,9 @@ for cm_val in cm_values:
                     data=sd, inits=init, show_console=False, psis_resample=True,
                 )
                 rep_elbos["mixed"][ti] = extract_elbo(fit)
+                # Collect for relative-error plot: Mixed + true topology + largest cm
+                if ti == 0 and cm_val == REL_ERR_CM:
+                    rel_err_stanvars.append(fit.stan_variables())
             except Exception as e:
                 if rep < 3:
                     print(f"    [WARN] Mixed {topology_labels[ti]} rep {rep+1}: {e}")
@@ -447,6 +459,13 @@ fig2.tight_layout()
 fig2.savefig("model_selection_weights.png", dpi=200, bbox_inches="tight")
 plt.show()
 print("Saved: model_selection_weights.png")
+
+# Relative-error box plot: Mixed model, true topology (T1), largest genome length
+plot_relative_error_boxplot(
+    dem_T1, rel_err_stanvars, varying=False,
+    outpath="model_selection_relative_error_Nfixed.png",
+    title="Parameter relative error (true topology)",
+)
 
 
 # ====================================================================

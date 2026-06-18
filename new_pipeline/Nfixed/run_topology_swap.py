@@ -48,6 +48,7 @@ from ibd_jackknife import (
     resample_ibd_with_jackknife_variance,
 )
 from demography import DemographicTopology
+from relative_error import plot_relative_error_boxplot
 from cmdstanpy import CmdStanModel
 
 
@@ -77,6 +78,8 @@ CM_PER_UNIT = 1e-4
 RECOMB_RATE = 1e-6
 MUT_RATE = 1e-6
 SAMPLES_PER_POP = {'a': 15, 'b': 15, 'c': 15, 'admix': 15}
+# Haploid sample count per population (diploid samples x ploidy 2)
+N_HAPLOID_PER_POP = {_p: 2 * _c for _p, _c in SAMPLES_PER_POP.items()}
 
 N_SIMS = 50
 SIM_CM_EACH = 50
@@ -193,6 +196,10 @@ mixed_stan = CmdStanModel(stan_file=os.path.join(_MODELS, "mixed_model_Nfixed.st
 # 4. Run replicates: fit T1 vs T_rev with mixed model
 # ====================================================================
 elbo_all = {cm: [] for cm in cm_values}
+# Per-replicate stan_variables() for the relative-error box plot:
+# Mixed model (only model here), true topology (ti == 0), largest genome length only.
+rel_err_stanvars = []
+REL_ERR_CM = cm_values[-1]
 
 rng = np.random.default_rng(seed=2025)
 _devnull = open(os.devnull, 'w')
@@ -247,13 +254,20 @@ for cm_val in cm_values:
             try:
                 with redirect_stdout(_devnull):
                     sd = build_mixed_stan_data(
-                        dem_infer, ibd_mean, ibd_var, bins, w_hat, w_se,
+                        dem_infer, ibd_mean, ibd_var, bins, w_hat, w_se, n_samples_per_pop=N_HAPLOID_PER_POP,
                         T_max=100000, cm=cm_val,
                     )
                 fit = mixed_stan.pathfinder(
                     data=sd, inits=init, show_console=False, psis_resample=True,
                 )
                 rep_elbos[ti] = extract_elbo(fit)
+
+                all_vars = fit.stan_variables()
+
+                # Collect for the relative-error box plot.
+                # Mixed model (only model here), true topology, largest genome length.
+                if ti == 0 and cm_val == REL_ERR_CM:
+                    rel_err_stanvars.append(all_vars)
             except Exception as e:
                 if rep < 3:
                     print(f"    [WARN] {topology_labels[ti]} rep {rep+1}: {e}")
@@ -357,6 +371,17 @@ fig.tight_layout()
 fig.savefig("topology_swap_elbo.png", dpi=200, bbox_inches="tight")
 plt.show()
 print("Saved: topology_swap_elbo.png")
+
+
+# ====================================================================
+# Parameter relative error (glike-style box plot)
+#     Mixed model, true topology (dem_sim == dem_T1), largest genome length.
+# ====================================================================
+plot_relative_error_boxplot(
+    dem_sim, rel_err_stanvars, varying=False,
+    outpath="topology_swap_relative_error_Nfixed.png",
+    title=f"Parameter relative error (Mixed, true topology, {REL_ERR_CM} cM)",
+)
 
 
 # ====================================================================

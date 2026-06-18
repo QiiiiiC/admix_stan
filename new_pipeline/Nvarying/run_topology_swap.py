@@ -44,6 +44,7 @@ from ibd_jackknife import (
     resample_ibd_with_jackknife_variance,
 )
 from demography import DemographicTopology
+from relative_error import plot_relative_error_boxplot
 from cmdstanpy import CmdStanModel
 
 
@@ -73,6 +74,8 @@ CM_PER_UNIT = 1e-4
 RECOMB_RATE = 1e-6
 MUT_RATE = 1e-6
 SAMPLES_PER_POP = {'a': 15, 'b': 15, 'c': 15, 'd': 15}
+# Haploid sample count per population (diploid samples x ploidy 2)
+N_HAPLOID_PER_POP = {_p: 2 * _c for _p, _c in SAMPLES_PER_POP.items()}
 
 N_SIMS = 50
 SIM_CM_EACH = 50
@@ -92,7 +95,6 @@ NE_REST = 20000  # haploid Ne for all other nodes
 
 SNP_CUTOFF_TIME = 1700
 SNP_MIN_MAF = 0.05
-FIXED_NE = NE_REST  # passed to build_snp_stan_data (ignored by Nvarying model)
 
 
 # ====================================================================
@@ -202,6 +204,11 @@ model_colors = ["#378ADD", "#4CAF50", "#E8A838"]
 # elbo_results[model_label][cm_val] = list of (elbo_T1, elbo_T2) tuples
 elbo_results = {label: {cm: [] for cm in cm_values} for label in model_labels}
 
+# Per-replicate stan_variables() for the relative-error box plot:
+# Mixed model, true topology (ti == 0, i.e. dem_T1), largest genome length only.
+rel_err_stanvars = []
+REL_ERR_CM = cm_values[-1]
+
 rng = np.random.default_rng(seed=2025)
 
 for cm_val in cm_values:
@@ -249,7 +256,9 @@ for cm_val in cm_values:
                 # Build init dict
                 init = {
                     "times": [100.0] * n_events_t,
-                    "Ne": [10000.0] * n_nodes_t,
+                    "mu_log": float(np.log(15000.0)),
+                    "sigma_log": 0.3,
+                    "Ne_raw": [0.0] * n_nodes_t,
                 }
                 if n_admix_t > 0:
                     init["admixture_fractions"] = [0.5] * n_admix_t
@@ -259,16 +268,16 @@ for cm_val in cm_values:
                 try:
                     if m_label == "IBD-only":
                         sd = build_ibd_stan_data(
-                            dem_infer, ibd_mean, ibd_var, bins,
+                            dem_infer, ibd_mean, ibd_var, bins, n_samples_per_pop=N_HAPLOID_PER_POP,
                             T_max=100000, cm=cm_val,
                         )
                     elif m_label == "SNP-only":
                         sd = build_snp_stan_data(
-                            dem_infer, w_hat, w_se, effective_N=FIXED_NE,
+                            dem_infer, w_hat, w_se,
                         )
                     else:  # Mixed
                         sd = build_mixed_stan_data(
-                            dem_infer, ibd_mean, ibd_var, bins, w_hat, w_se,
+                            dem_infer, ibd_mean, ibd_var, bins, w_hat, w_se, n_samples_per_pop=N_HAPLOID_PER_POP,
                             T_max=100000, cm=cm_val,
                         )
 
@@ -277,6 +286,12 @@ for cm_val in cm_values:
                         psis_resample=True,
                     )
                     rep_elbos[ti] = extract_elbo(fit)
+
+                    # Collect for the relative-error box plot.
+                    if (m_label == "Mixed" and ti == 0
+                            and cm_val == REL_ERR_CM):
+                        all_vars = fit.stan_variables()
+                        rel_err_stanvars.append(all_vars)
                 except Exception as e:
                     if rep < 3:
                         print(f"    [WARN] {m_label} {topology_labels[ti]} "
@@ -396,6 +411,17 @@ fig.tight_layout(rect=[0, 0, 1, 0.95])
 fig.savefig("topology_swap_Nvarying.png", dpi=200, bbox_inches="tight")
 plt.show()
 print("Saved: topology_swap_Nvarying.png")
+
+
+# ====================================================================
+# Parameter relative error (glike-style box plot)
+# Mixed model, true topology (dem_T1), largest genome length.
+# ====================================================================
+plot_relative_error_boxplot(
+    dem_T1, rel_err_stanvars, varying=True,
+    outpath="topology_swap_Nvarying_relative_error.png",
+    title=f"Parameter relative error (Mixed, true topology, {REL_ERR_CM} cM)",
+)
 
 
 # ====================================================================

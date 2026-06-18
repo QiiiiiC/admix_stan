@@ -130,7 +130,7 @@ prior_settings = [
 n_events_t = len(dem.ordered_events)
 n_nodes_t  = len(dem.nodes)
 
-init = {"times": [100.0] * n_events_t, "Ne": [10000.0] * n_nodes_t}
+init = {"times": [100.0] * n_events_t, "mu_log": float(np.log(15000.0)), "sigma_log": 0.3, "Ne_raw": [0.0] * n_nodes_t}
 
 results = []
 for label, shape, rate in prior_settings:
@@ -139,7 +139,7 @@ for label, shape, rate in prior_settings:
     print(f"  prior mean = {shape/rate:.1f}, mode = {max(0, (shape-1)/rate):.1f}")
     print("=" * 70)
 
-    sd = build_snp_stan_data(dem, w_hat, w_se, effective_N=NE_REST)
+    sd = build_snp_stan_data(dem, w_hat, w_se)
     sd['ne_prior_shape'] = shape
     sd['ne_prior_rate']  = rate
 

@@ -25,17 +25,19 @@ data {
 parameters {
     vector<lower=1>[n_events] times;
     array[n_admixture] real<lower=0, upper=1> admixture_fractions;
-    real mu_log_Ne;
-    real<lower=0> sigma_log_Ne;
-    vector[n_nodes] z_Ne;
+
+    // Hierarchical log-normal prior for effective population sizes (non-centered):
+    //   Ne[a] = exp(mu_log + sigma_log * Ne_raw[a]),  Ne_raw[a] ~ N(0, 1).
+    // mu_log = mean-of-log (normal prior), sigma_log = sd-of-log (half-normal).
+    // Ne is built in the transformed parameters block below.
+    real mu_log;
+    real<lower=0> sigma_log;
+    vector[n_nodes] Ne_raw;
 }
 
 transformed parameters {
-    vector<lower=0>[n_nodes] Ne;
-
-    for (a in 1:n_nodes) {
-        Ne[a] = exp(mu_log_Ne + sigma_log_Ne * z_Ne[a]);
-    }
+    // Non-centered per-node effective sizes: Ne ~ lognormal(mu_log, sigma_log).
+    vector<lower=0>[n_nodes] Ne = exp(mu_log + sigma_log * Ne_raw);
     vector[n_events] cumulative_times = cumulative_sum(times);
     matrix[n_nodes, n_nodes] I = diag_matrix(rep_vector(1.0, n_nodes));
 
@@ -122,9 +124,14 @@ transformed parameters {
 model {
     times ~ exponential(0.01);
     admixture_fractions ~ beta(1.0, 1.0);
-    mu_log_Ne ~ normal(log(10000), 0.2);
-    sigma_log_Ne ~ exponential(0.2);
-    z_Ne ~ normal(0, 1.0);
+
+    // Non-centered hierarchical log-normal for Ne: Ne_raw carries the per-node
+    // variation, so there is no funnel between Ne and sigma_log.  Each Ne has
+    // median pinned at 15000; the marginal prior is mean ~16200, SD ~7400
+    // (a log-normal's mean sits above its median).
+    mu_log    ~ normal(log(15000), 0.25);  // log-scale location; median Ne = 15000
+    sigma_log ~ normal(0, 0.3);            // half-normal (sigma_log >= 0); per-node spread
+    Ne_raw    ~ std_normal();
 
     for (i in 1:n_leaves) {
         for (j in i:n_leaves) {

@@ -1,0 +1,497 @@
+"""
+Recent + ancient admixture topology (the run_mixed_beats_both Nvarying
+experiment), but run through the Nfixed Stan models (single shared
+`effective_N` instead of per-node Ne) with a uniform population size of
+20000 throughout the simulation.
+
+True topology (T_true): 5 populations (a, b, c, d, e) with TWO admixtures:
+  - RECENT admixture on b (t=30): b is a mix of an a-lineage and a c-lineage
+  - ANCIENT admixture on d (t=500): d is a mix of a c-lineage and an e-lineage
+
+Alternatives for the dELBO comparison:
+  T_alt1 (ancient only): no recent b-admixture (b is a normal sister of a)
+  T_alt2 (recent only):  no ancient d-admixture (d is a normal sister of c)
+
+Predictions (same as the Nvarying version):
+  IBD-only: dELBO(true-alt1) >  0  (sees recent admix in long segments)
+            dELBO(true-alt2) ~  0  (blind to ancient admix)
+  SNP-only: dELBO(true-alt1) ~  0  (recent admix near-invisible)
+            dELBO(true-alt2) >  0  (sees ancient admix in f-stats)
+"""
+
+import sys, os, time
+_PARENT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, _PARENT)
+_MODELS = os.path.join(_PARENT, "models")
+# Write every figure (results + topology diagram) next to this script.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
+import re
+
+from simulation_methods import (
+    simulate_msprime,
+    build_ibd_stan_data,
+    build_snp_stan_data,
+    build_mixed_stan_data,
+)
+from inference_methods import (
+    prepare_snp_blocks,
+    pool_snp_blocks,
+    resample_snp_covariance,
+)
+from ibd_jackknife import (
+    calculate_ibd_blocks_mrca,
+    pool_multiple_simulations,
+    resample_ibd_with_jackknife_variance,
+)
+from demography import DemographicTopology
+from relative_error import plot_relative_error_boxplot
+from admix_plots import plot_delbo_boxplot, plot_param_comparison
+from cmdstanpy import CmdStanModel
+
+
+def extract_elbo(fit):
+    best = -np.inf
+    for stdout_file in fit._runset.stdout_files:
+        try:
+            with open(stdout_file, 'r') as f:
+                for line in f:
+                    m = re.search(r'Best Iter:.*?ELBO \(([-+\d.eE]+)\)', line)
+                    if m:
+                        v = float(m.group(1))
+                        if v > best:
+                            best = v
+        except (OSError, ValueError):
+            continue
+    return best if np.isfinite(best) else np.nan
+
+
+def get_admix_event_mapping(dem):
+    mapping = []
+    admix_counter = 0
+    for i, ev in enumerate(dem.ordered_events):
+        if ev['type'] == 'ADMIXTURE':
+            mapping.append((ev['child'], i, admix_counter))
+            admix_counter += 1
+    return mapping
+
+
+def get_merge_event_index(dem, parent_name):
+    for i, ev in enumerate(dem.ordered_events):
+        if ev['type'] == 'MERGE' and ev['parent'] == parent_name:
+            return i
+    return None
+
+
+# ====================================================================
+# 0. Configuration
+# ====================================================================
+N_REPLICATES   = 100
+BLOCK_SIZE_CM  = 50.0
+CM_PER_UNIT    = 1e-6       # 1 cM per Mb (standard human)
+RECOMB_RATE    = 1e-8       # crossovers/bp/generation
+MUT_RATE       = 1.25e-8    # mutations/bp/generation
+SAMPLES_PER_POP = {'a': 20, 'b': 20, 'c': 20, 'd': 20, 'e': 20}
+# Haploid sample count per population (diploid samples x ploidy 2)
+N_HAPLOID_PER_POP = {_p: 2 * _c for _p, _c in SAMPLES_PER_POP.items()}
+
+N_SIMS = 50
+SIM_CM_EACH = 50
+SIM_SEQ_LEN = SIM_CM_EACH / CM_PER_UNIT
+
+cm_values = [50, 100, 150, 200, 300, 500, 750, 1000]
+
+# Compare bins from 1.0 cM (matches the Hap-IBD / FastSMC runs exactly)
+bins = [
+    [1.0, 1.25],[1.25,1.5],
+    [1.5, 1.75],[1.75,2.0], [2.0, 2.5],[2.5,3.0],
+    [3.0,4.0],[4.0,5.0],[5.0, 6.0],[6.0,7.5],
+    [7.5, 12.0],[12.0,20.0], [20.0, BLOCK_SIZE_CM]
+]
+
+# Single uniform Ne everywhere (haploid; demography API takes diploid = haploid//2)
+NE_UNIFORM = 20000
+
+# --- Recent admixture on b ---
+T_RECENT     = 30      # b admixture time
+ALPHA_RECENT = 0.70    # b: fraction from the a-side parent (bP1)
+
+# --- Ancient admixture on d ---
+T_OLD = 500            # d admixture time
+F_OLD = 0.60           # d: fraction from the c-side parent (dP1)
+
+# --- Merge event times ---
+T_AB    = 50
+T_CB    = 100
+T_CBD   = 700
+T_LEFT  = 1000
+T_RIGHT = 1200
+T_ROOT  = 1500
+
+SNP_CUTOFF_TIME = T_ROOT
+SNP_MIN_MAF = 0.05
+
+
+# ====================================================================
+# 1. Topology builders
+# ====================================================================
+def _set_uniform_ne(dem, ne_haploid):
+    for n in dem.nodes:
+        dem.set_node_ne(n, ne_haploid // 2)
+
+
+def build_t_true():
+    """Recent admixture on b + ancient admixture on d, all Ne uniform."""
+    d = DemographicTopology(['a', 'b', 'c', 'd', 'e'])
+    d.add_admixture_event('b', 'bP1', 'bP2')     # recent: b mixes a-side + c-side
+    d.add_merge_event('a', 'bP1', 'ab')
+    d.add_merge_event('c', 'bP2', 'cb')
+    d.add_admixture_event('d', 'dP1', 'dP2')     # ancient: d mixes c-side + e-side
+    d.add_merge_event('cb', 'dP1', 'cbd')
+    d.add_merge_event('ab', 'cbd', 'left')
+    d.add_merge_event('e',  'dP2', 'right')
+    d.add_merge_event('left', 'right', 'root')
+
+    _set_uniform_ne(d, NE_UNIFORM)
+
+    d.set_admixture_parameters('b', time=T_RECENT,
+                               fraction_parent_1=ALPHA_RECENT,
+                               parent_1_name='bP1')
+    d.set_admixture_parameters('d', time=T_OLD,
+                               fraction_parent_1=F_OLD,
+                               parent_1_name='dP1')
+    d.set_merge_time('ab',    T_AB)
+    d.set_merge_time('cb',    T_CB)
+    d.set_merge_time('cbd',   T_CBD)
+    d.set_merge_time('left',  T_LEFT)
+    d.set_merge_time('right', T_RIGHT)
+    d.set_merge_time('root',  T_ROOT)
+    d.finalize_root()
+    return d
+
+
+def build_t_alt1():
+    """Ancient admixture on d only; b is a normal sister of a."""
+    d = DemographicTopology(['a', 'b', 'c', 'd', 'e'])
+    d.add_merge_event('a', 'b', 'ab')
+    d.add_admixture_event('d', 'dP1', 'dP2')
+    d.add_merge_event('c', 'dP1', 'cdP1')
+    d.add_merge_event('ab', 'cdP1', 'left')
+    d.add_merge_event('e',  'dP2', 'right')
+    d.add_merge_event('left', 'right', 'root')
+    _set_uniform_ne(d, NE_UNIFORM)
+    d.finalize_root()
+    return d
+
+
+def build_t_alt2():
+    """Recent admixture on b only; d is a normal sister of c."""
+    d = DemographicTopology(['a', 'b', 'c', 'd', 'e'])
+    d.add_admixture_event('b', 'bP1', 'bP2')
+    d.add_merge_event('a', 'bP1', 'ab')
+    d.add_merge_event('c', 'bP2', 'cb')
+    d.add_merge_event('cb', 'd', 'cbd')
+    d.add_merge_event('ab', 'cbd', 'left')
+    d.add_merge_event('left', 'e', 'root')
+    _set_uniform_ne(d, NE_UNIFORM)
+    d.finalize_root()
+    return d
+
+
+print("=" * 60)
+print(f"Defining topologies (Nfixed, Ne_uniform={NE_UNIFORM})")
+print("=" * 60)
+dem_true = build_t_true()
+
+# --- Save a diagram of the (true) data-generating topology in this folder ---
+_topo_fig, _topo_ax = plt.subplots(figsize=(10, 6))
+dem_true.plot_demography(scale=True, ax=_topo_ax)
+_topo_ax.set_title('recent_plus_ancient (true topology)')
+_topo_fig.savefig(os.path.join(_HERE, 'topology_recent_plus_ancient.png'),
+                  dpi=200, bbox_inches='tight')
+plt.close(_topo_fig)
+print(f"[topology] saved {os.path.join(_HERE, 'topology_recent_plus_ancient.png')}")
+dem_alt1 = build_t_alt1()
+dem_alt2 = build_t_alt2()
+
+topology_dems = [dem_true, dem_alt1, dem_alt2]
+topology_labels = [
+    "T_true (recent b + ancient d)",
+    "T_alt1 (ancient only)",
+    "T_alt2 (recent only)",
+]
+for lbl, d in zip(topology_labels, topology_dems):
+    print(f"  {lbl}: n_events={len(d.ordered_events)}, "
+          f"n_admix={d.n_admix}, n_nodes={len(d.nodes)}")
+
+n_topos = len(topology_dems)
+dem_sim = dem_true
+
+
+# ====================================================================
+# 2. Simulate and pool blocks
+# ====================================================================
+packed_list = []
+n_blocks_list = []
+snp_blocks_list = []
+pair_info = None
+pop_ids = None
+
+for sim_i in range(N_SIMS):
+    print(f"\n--- Simulation {sim_i + 1}/{N_SIMS} ({SIM_CM_EACH} cM) ---")
+    t0 = time.time()
+    mts = simulate_msprime(
+        dem_sim,
+        sequence_length=SIM_SEQ_LEN,
+        recombination_rate=RECOMB_RATE,
+        mutation_rate=MUT_RATE,
+        samples_per_pop=SAMPLES_PER_POP,
+        seed=42 + sim_i,
+    )
+    t1 = time.time()
+    print(f"  [msprime] {t1 - t0:.2f}s  |  "
+          f"n_trees={mts.num_trees}  n_sites={mts.num_sites}")
+
+    packed, n_blocks, pop_samples, pids, pi = calculate_ibd_blocks_mrca(
+        mts, bins=bins,
+        block_size_cm=BLOCK_SIZE_CM, cm_per_unit=CM_PER_UNIT,
+    )
+    t2 = time.time()
+    print(f"  [IBD] {t2 - t1:.2f}s")
+    packed_list.append(packed)
+    n_blocks_list.append(n_blocks)
+    if pair_info is None:
+        pair_info = pi
+        pop_ids = pids
+
+    snp_blks, _ = prepare_snp_blocks(
+        mts, dem_sim,
+        block_size_cm=BLOCK_SIZE_CM, cm_per_unit=CM_PER_UNIT,
+        cutoff_time=SNP_CUTOFF_TIME, min_maf=SNP_MIN_MAF,
+    )
+    t3 = time.time()
+    print(f"  [SNP] {t3 - t2:.2f}s")
+    snp_blocks_list.append(snp_blks)
+
+pooled_ibd, total_blocks = pool_multiple_simulations(packed_list, n_blocks_list)
+pooled_snp = pool_snp_blocks(snp_blocks_list)
+
+print(f"\nTotal pool: {total_blocks} blocks of {BLOCK_SIZE_CM} cM "
+      f"= {total_blocks * BLOCK_SIZE_CM} cM from {N_SIMS} simulations")
+
+
+# ====================================================================
+# 3. Compile Stan models (Nfixed variants)
+# ====================================================================
+ibd_stan = CmdStanModel(stan_file=os.path.join(_MODELS, "ibd_model_Nfixed.stan"))
+snp_stan = CmdStanModel(stan_file=os.path.join(_MODELS, "snp_model_Nfixed.stan"))
+mixed_stan = CmdStanModel(stan_file=os.path.join(_MODELS, "mixed_model_Nfixed.stan"))
+
+model_labels = ["IBD-only", "SNP-only", "Mixed"]
+model_stans = [ibd_stan, snp_stan, mixed_stan]
+model_colors = ["#378ADD", "#4CAF50", "#E8A838"]
+
+
+# ====================================================================
+# 4. Per-topology event indices for parameter extraction
+# ====================================================================
+admix_mappings = [get_admix_event_mapping(d) for d in topology_dems]
+
+for ti, (lbl, mp) in enumerate(zip(topology_labels, admix_mappings)):
+    print(f"  {lbl} admix mapping: {mp}")
+
+
+# ====================================================================
+# 5. Run replicates
+# ====================================================================
+elbo_results = {label: {cm: [] for cm in cm_values} for label in model_labels}
+admix_params = {
+    label: {ti: {cm: [] for cm in cm_values} for ti in range(n_topos)}
+    for label in model_labels
+}
+# Per-replicate stan_variables() for the relative-error box plot:
+# Mixed model, true topology (ti == 0), largest genome length only.
+rel_err_stanvars = []
+REL_ERR_CM = cm_values[-1]
+
+rng = np.random.default_rng(seed=2025)
+
+for cm_val in cm_values:
+    print(f"\n{'='*60}")
+    print(f"  cm = {cm_val} cM  ({N_REPLICATES} reps x {n_topos} topos x {len(model_labels)} models)")
+    print(f"{'='*60}")
+
+    n_blocks_needed = max(1, int(round(cm_val / BLOCK_SIZE_CM)))
+
+    for rep in range(N_REPLICATES):
+        if (rep + 1) % 10 == 0:
+            print(f"  replicate {rep + 1}/{N_REPLICATES}")
+
+        chosen_blocks = rng.choice(total_blocks, size=n_blocks_needed, replace=False)
+
+        ibd_mean, ibd_var = resample_ibd_with_jackknife_variance(
+            pooled_ibd, n_blocks_total=total_blocks,
+            pop_ids=pop_ids, pair_info=pair_info, bins=bins,
+            target_cm=cm_val, block_size_cm=BLOCK_SIZE_CM,
+            chosen_blocks=chosen_blocks,
+        )
+
+        leaves = dem_sim.initial_leaves
+        n_haploid = np.array([SAMPLES_PER_POP[p] * 2 for p in leaves])
+        w_hat, w_se = resample_snp_covariance(
+            pooled_snp, chosen_blocks,
+            n_haploid_per_pop=n_haploid, se_block_size=50,
+        )
+
+        for m_idx, (m_label, m_stan) in enumerate(zip(model_labels, model_stans)):
+            rep_elbos = [np.nan] * n_topos
+
+            for ti, dem_infer in enumerate(topology_dems):
+                n_events_t = len(dem_infer.ordered_events)
+                n_admix_t = dem_infer.n_admix
+
+                # Nfixed init dicts: scalar effective_N, no Ne vector.
+                init = {
+                    "times": [100.0] * n_events_t,
+                }
+                if n_admix_t > 0:
+                    init["admixture_fractions"] = [0.5] * n_admix_t
+                # All three Nfixed models carry a single `effective_N` parameter;
+                # it must be initialised near the truth or Pathfinder fails from
+                # its random start (this was the SNP-only "no result" bug --
+                # SNP-only was the only model not getting an effective_N init).
+                init["effective_N"] = float(NE_UNIFORM)
+                if m_label == "Mixed":
+                    init["kappa_snp"] = 1.0
+
+                try:
+                    if m_label == "IBD-only":
+                        sd = build_ibd_stan_data(
+                            dem_infer, ibd_mean, ibd_var, bins, n_samples_per_pop=N_HAPLOID_PER_POP,
+                            T_max=100000, cm=cm_val,
+                        )
+                    elif m_label == "SNP-only":
+                        sd = build_snp_stan_data(
+                            dem_infer, w_hat, w_se,
+                        )
+                    else:
+                        sd = build_mixed_stan_data(
+                            dem_infer, ibd_mean, ibd_var, bins, w_hat, w_se, n_samples_per_pop=N_HAPLOID_PER_POP,
+                            T_max=100000, cm=cm_val,
+                        )
+
+                    fit = m_stan.pathfinder(
+                        data=sd, inits=init, show_console=False,
+                        psis_resample=True,
+                    )
+                    rep_elbos[ti] = extract_elbo(fit)
+
+                    all_vars = fit.stan_variables()
+
+                    # Collect for the relative-error box plot.
+                    if (m_label == "Mixed" and ti == 0
+                            and cm_val == REL_ERR_CM):
+                        rel_err_stanvars.append(all_vars)
+
+                    cum_t = all_vars['cumulative_times']
+                    admix_f = all_vars.get('admixture_fractions', None)
+                    pdict = {}
+                    for child, ct_idx, af_idx in admix_mappings[ti]:
+                        pdict[f'{child}_time'] = cum_t[:, ct_idx].mean()
+                        if admix_f is not None:
+                            if admix_f.ndim > 1:
+                                pdict[f'{child}_frac'] = admix_f[:, af_idx].mean()
+                            else:
+                                pdict[f'{child}_frac'] = float(admix_f.mean())
+                    admix_params[m_label][ti][cm_val].append(pdict)
+
+                except Exception as e:
+                    if rep < 3:
+                        print(f"    [WARN] {m_label} {topology_labels[ti]} "
+                              f"rep {rep+1}: {e}")
+
+            if all(np.isfinite(rep_elbos)):
+                elbo_results[m_label][cm_val].append(tuple(rep_elbos))
+
+
+# ====================================================================
+# 6a. Plot 1: dELBO comparison box plot (all 3 models, means marked)
+# ====================================================================
+comparisons = [
+    ("T_true - T_alt1 (detects RECENT admix?)", 0, 1),
+    ("T_true - T_alt2 (detects ANCIENT admix?)", 0, 2),
+]
+plot_delbo_boxplot(
+    elbo_results, cm_values, model_labels, model_colors, comparisons,
+    outpath=os.path.join(_HERE, "recent_plus_ancient_dELBO_Nfixed.png"),
+    suptitle=(f"Nfixed (uniform Ne={NE_UNIFORM}): dELBO comparison  |  "
+              f"recent b admix t={T_RECENT}, alpha={ALPHA_RECENT}  |  "
+              f"ancient d admix t={T_OLD}, f={F_OLD}  |  "
+              f"bins from {bins[0][0]} cM"),
+)
+
+
+# ====================================================================
+# 6b. Plot 2: parameter comparison (IBD-only vs Mixed)
+# ====================================================================
+TOPO_COLORS = {0: "#1f77b4", 1: "#ff7f0e", 2: "#2ca02c"}
+param_rows = [
+    ("Recent admix time (b)",      "b_time", float(T_RECENT),
+     [(0, "T_true"), (2, "T_alt2")]),
+    ("Recent admix fraction (b)",  "b_frac", ALPHA_RECENT,
+     [(0, "T_true"), (2, "T_alt2")]),
+    ("Ancient admix time (d)",     "d_time", float(T_OLD),
+     [(0, "T_true"), (1, "T_alt1")]),
+    ("Ancient admix fraction (d)", "d_frac", F_OLD,
+     [(0, "T_true"), (1, "T_alt1")]),
+]
+plot_param_comparison(
+    admix_params, cm_values, param_rows, ["IBD-only", "Mixed"], TOPO_COLORS,
+    outpath=os.path.join(_HERE, "recent_plus_ancient_params_Nfixed.png"),
+    suptitle=f"Nfixed (Ne={NE_UNIFORM}): parameter recovery (IBD-only vs Mixed)",
+)
+
+
+# ====================================================================
+# 6c. Plot 3: Parameter relative error (glike-style box plot)
+#     Mixed model, true topology, largest genome length.
+# ====================================================================
+plot_relative_error_boxplot(
+    dem_true, rel_err_stanvars, varying=False,
+    outpath=os.path.join(_HERE, "recent_plus_ancient_relative_error_Nfixed.png"),
+    title=f"Parameter relative error (Mixed, true topology, {REL_ERR_CM} cM)",
+)
+
+
+# ====================================================================
+# 7. Summary table
+# ====================================================================
+print("\n" + "=" * 110)
+print("NFIXED SANITY CHECK - SUMMARY")
+print("=" * 110)
+print(f"{'cm':>6s} | {'Model':>10s} | "
+      f"{'dELBO(true-alt1)':>18s} | {'%win_alt1':>10s} | "
+      f"{'dELBO(true-alt2)':>18s} | {'%win_alt2':>10s} | "
+      f"{'n_ok':>5s}")
+print("-" * 110)
+
+for cm_val in cm_values:
+    for m_label in model_labels:
+        elbos = elbo_results[m_label][cm_val]
+        if len(elbos) > 0:
+            arr = np.array(elbos)
+            d1 = arr[:, 0] - arr[:, 1]
+            d2 = arr[:, 0] - arr[:, 2]
+            pct1 = 100.0 * np.mean(d1 > 0)
+            pct2 = 100.0 * np.mean(d2 > 0)
+            print(f"{cm_val:6d} | {m_label:>10s} | "
+                  f"{np.mean(d1):+17.1f} | {pct1:9.1f}% | "
+                  f"{np.mean(d2):+17.1f} | {pct2:9.1f}% | "
+                  f"{len(elbos):5d}")
+        else:
+            print(f"{cm_val:6d} | {m_label:>10s} | "
+                  f"{'N/A':>18s} | {'N/A':>10s} | "
+                  f"{'N/A':>18s} | {'N/A':>10s} | {0:5d}")

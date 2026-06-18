@@ -29,6 +29,7 @@ from ibd_jackknife import (
 )
 from demography import DemographicTopology
 from cmdstanpy import CmdStanModel
+from relative_error import plot_relative_error_boxplot
 import re
 
 
@@ -62,6 +63,8 @@ CM_PER_UNIT = 1e-4
 RECOMB_RATE = 1e-6
 MUT_RATE = 1e-6
 SAMPLES_PER_POP = {'a': 15, 'b': 15, 'c': 15, 'admix': 15}
+# Haploid sample count per population (diploid samples x ploidy 2)
+N_HAPLOID_PER_POP = {_p: 2 * _c for _p, _c in SAMPLES_PER_POP.items()}
 
 # Number of independent simulations to pool
 N_SIMS = 50
@@ -84,7 +87,6 @@ true_vals = {
 
 SNP_CUTOFF_TIME = 1500  # keep only mutations older than this
 SNP_MIN_MAF = 0.05
-FIXED_NE = 6000         # fixed Ne for SNP-only model
 
 # ====================================================================
 # 1. Define topology
@@ -169,6 +171,10 @@ elbo_ibd = {cm_val: [] for cm_val in cm_values}
 elbo_snp = {cm_val: [] for cm_val in cm_values}
 elbo_mixed = {cm_val: [] for cm_val in cm_values}
 
+# Relative-error collector: Mixed model, single topology, largest cm only
+rel_err_stanvars = []
+REL_ERR_CM = cm_values[-1]
+
 rng = np.random.default_rng(seed=2025)
 
 for cm_val in cm_values:
@@ -218,6 +224,9 @@ for cm_val in cm_values:
         init_snp = {
             "times": [100.0] * n_events,
             "admixture_fractions": [0.5] * n_admix,
+            # effective_N is a parameter in snp_model_Nfixed.stan; init near truth
+            # or Pathfinder fails from its random start.
+            "effective_N": 10000.0,
         }
         init_mixed = {
             "times": [100.0] * n_events,
@@ -229,7 +238,7 @@ for cm_val in cm_values:
         # --- Model 1: IBD-only ---
         try:
             stan_data = build_ibd_stan_data(
-                dem, ibd_mean, ibd_var, bins,
+                dem, ibd_mean, ibd_var, bins, n_samples_per_pop=N_HAPLOID_PER_POP,
                 T_max=100000, cm=cm_val,
             )
             fit = ibd_model.pathfinder(
@@ -246,7 +255,7 @@ for cm_val in cm_values:
         # --- Model 2: SNP-only ---
         try:
             stan_data = build_snp_stan_data(
-                dem, w_hat, w_se, effective_N=FIXED_NE,
+                dem, w_hat, w_se,
             )
             fit = snp_model.pathfinder(
                 data=stan_data, inits=init_snp, show_console=False,
@@ -262,7 +271,7 @@ for cm_val in cm_values:
         # --- Model 3: Mixed ---
         try:
             stan_data = build_mixed_stan_data(
-                dem, ibd_mean, ibd_var, bins, w_hat, w_se,
+                dem, ibd_mean, ibd_var, bins, w_hat, w_se, n_samples_per_pop=N_HAPLOID_PER_POP,
                 T_max=100000, cm=cm_val,
             )
             fit = mixed_model.pathfinder(
@@ -273,6 +282,9 @@ for cm_val in cm_values:
             pmeans = {name: draws.mean(axis=0) for name, draws in all_vars.items()}
             results_mixed[cm_val].append(pmeans)
             elbo_mixed[cm_val].append(extract_elbo(fit))
+            # Collect for relative-error plot: Mixed + largest cm
+            if cm_val == REL_ERR_CM:
+                rel_err_stanvars.append(all_vars)
         except Exception as e:
             print(f"    [WARN] Mixed rep {rep+1} failed: {e}")
 
@@ -422,6 +434,13 @@ fig2.tight_layout()
 fig2.savefig("elbo_comparison.png", dpi=200, bbox_inches="tight")
 plt.show()
 print("Saved: elbo_comparison.png")
+
+# Relative-error box plot: Mixed model, true topology, largest genome length
+plot_relative_error_boxplot(
+    dem, rel_err_stanvars, varying=False,
+    outpath="snp_ibd_mixed_comparison_relative_error_Nfixed.png",
+    title="Parameter relative error (true topology)",
+)
 
 # ====================================================================
 # 7. Print summary table

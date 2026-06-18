@@ -68,6 +68,9 @@ data {
     array[n_leaf_pairs] int<lower=1, upper=n_leaves> pair_i;
     array[n_leaf_pairs] int<lower=1, upper=n_leaves> pair_j;
 
+    // Number of haploid samples per population (leaf), used for pair counts
+    array[n_leaves] int<lower=0> n_samples;
+
     // Observation block
     array[n_bins] matrix<lower=0>[n_leaves, n_leaves] ibd_hat;
     array[n_bins] matrix<lower=0>[n_leaves, n_leaves] ibd_se;
@@ -76,7 +79,7 @@ data {
 parameters {
     vector<lower=1>[n_events] times;
     array[n_admixture] real<lower=0, upper=1> admixture_fractions;
-    real<lower=1000, upper=20000> effective_N;
+    real<lower=0> effective_N;
 }
 
 transformed parameters {
@@ -214,7 +217,8 @@ transformed parameters {
 model {
     times ~ exponential(0.01);
     admixture_fractions ~ beta(1, 1);
-    effective_N ~ normal(10000, 3000) T[1000, 20000];
+    // Gamma prior: mean 15000, sd 7500 (shape 4 => coefficient of variation 0.5)
+    effective_N ~ gamma(4.0, 4.0 / 15000.0);
 
     for (i in 1:n_leaves) {
         for (j in i:n_leaves) {
@@ -224,9 +228,9 @@ model {
                         target += normal_lpdf(ibd_hat[b][i,j] |ibd_fraction[b][i, j], ibd_se[b][i, j]);
                     } else {
                         if(i == j){
-                            target += -ibd_number[b][i,j] * cm * 30.0 * 29.0 /2.0;
+                            target += -ibd_number[b][i,j] * cm * n_samples[i] * (n_samples[i] - 1) / 2.0;
                         } else {
-                            target += -ibd_number[b][i,j] * cm * 30.0 * 30.0;
+                            target += -ibd_number[b][i,j] * cm * n_samples[i] * n_samples[j];
                         }
                     }
                 

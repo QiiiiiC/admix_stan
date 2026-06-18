@@ -84,6 +84,7 @@ from ibd_jackknife import (
     resample_ibd_with_jackknife_variance,
 )
 from demography import DemographicTopology
+from relative_error import plot_relative_error_boxplot
 from cmdstanpy import CmdStanModel
 
 
@@ -130,6 +131,8 @@ CM_PER_UNIT = 1e-4
 RECOMB_RATE = 1e-6
 MUT_RATE = 1e-6
 SAMPLES_PER_POP = {'a': 15, 'b': 15, 'c': 15, 'd': 15}
+# Haploid sample count per population (diploid samples x ploidy 2)
+N_HAPLOID_PER_POP = {_p: 2 * _c for _p, _c in SAMPLES_PER_POP.items()}
 
 N_SIMS = 50
 SIM_CM_EACH = 50
@@ -168,7 +171,6 @@ T_ROOT        = 1500
 
 SNP_CUTOFF_TIME = T_ROOT
 SNP_MIN_MAF = 0.05
-FIXED_NE = NE_BASE
 
 
 # ====================================================================
@@ -351,6 +353,10 @@ ne_params = {
     label: {cm: [] for cm in cm_values}
     for label in model_labels
 }
+# Per-replicate stan_variables() for the relative-error box plot:
+# Mixed model, true topology (ti == 0), largest genome length only.
+rel_err_stanvars = []
+REL_ERR_CM = cm_values[-1]
 
 rng = np.random.default_rng(seed=2025)
 
@@ -391,9 +397,11 @@ for cm_val in cm_values:
 
                 init = {
                     "times": [100.0] * n_events_t,
-                    "mu_log_Ne": np.log(10000.0),
-                    "sigma_log_Ne": 0.2,
-                    "z_Ne": [0.0] * n_nodes_t,
+                    "mu_Ne": 15000.0,
+                    "sd_Ne": 7500.0,
+                    "mu_log": float(np.log(15000.0)),
+                    "sigma_log": 0.3,
+                    "Ne_raw": [0.0] * n_nodes_t,
                 }
                 if n_admix_t > 0:
                     init["admixture_fractions"] = [0.5] * n_admix_t
@@ -403,16 +411,16 @@ for cm_val in cm_values:
                 try:
                     if m_label == "IBD-only":
                         sd = build_ibd_stan_data(
-                            dem_infer, ibd_mean, ibd_var, bins,
+                            dem_infer, ibd_mean, ibd_var, bins, n_samples_per_pop=N_HAPLOID_PER_POP,
                             T_max=100000, cm=cm_val,
                         )
                     elif m_label == "SNP-only":
                         sd = build_snp_stan_data(
-                            dem_infer, w_hat, w_se, effective_N=FIXED_NE,
+                            dem_infer, w_hat, w_se,
                         )
                     else:
                         sd = build_mixed_stan_data(
-                            dem_infer, ibd_mean, ibd_var, bins, w_hat, w_se,
+                            dem_infer, ibd_mean, ibd_var, bins, w_hat, w_se, n_samples_per_pop=N_HAPLOID_PER_POP,
                             T_max=100000, cm=cm_val,
                         )
 
@@ -423,22 +431,28 @@ for cm_val in cm_values:
                     rep_elbos[ti] = extract_elbo(fit)
 
                     all_vars = fit.stan_variables()
+
+                    # Collect for the relative-error box plot.
+                    if (m_label == "Mixed" and ti == 0
+                            and cm_val == REL_ERR_CM):
+                        rel_err_stanvars.append(all_vars)
+
                     cum_t = all_vars['cumulative_times']
                     admix_f = all_vars.get('admixture_fractions', None)
-                    mu_log_ne = all_vars.get('mu_log_Ne', None)
-                    sigma_log_ne = all_vars.get('sigma_log_Ne', None)
-                    
+                    mu_ne = all_vars.get('mu_Ne', None)
+                    sd_ne = all_vars.get('sd_Ne', None)
+
                     # Store Ne parameters
-                    if mu_log_ne is not None and sigma_log_ne is not None:
-                        if mu_log_ne.ndim > 0:
+                    if mu_ne is not None and sd_ne is not None:
+                        if mu_ne.ndim > 0:
                             ne_params[m_label][cm_val].append({
-                                'mu_log_Ne': mu_log_ne.mean(),
-                                'sigma_log_Ne': sigma_log_ne.mean()
+                                'mu_Ne': mu_ne.mean(),
+                                'sd_Ne': sd_ne.mean()
                             })
                         else:
                             ne_params[m_label][cm_val].append({
-                                'mu_log_Ne': float(mu_log_ne),
-                                'sigma_log_Ne': float(sigma_log_ne)
+                                'mu_Ne': float(mu_ne),
+                                'sd_Ne': float(sd_ne)
                             })
                     
                     pdict = {}
@@ -673,54 +687,54 @@ print("Saved: admix_thru_b_plus_ancient_params.png")
 
 
 # ====================================================================
-# 6b. Plot 2: Ne parameters (mu_log_Ne and sigma_log_Ne) across cM values
+# 6b. Plot 2: Ne hyperparameters (mu_Ne and sd_Ne) across cM values
 # ====================================================================
 fig3, axes3 = plt.subplots(1, 2, figsize=(16, 6))
 
-# Plot mu_log_Ne
+# Plot mu_Ne
 ax_mu = axes3[0]
 for m_idx, m_label in enumerate(model_labels):
     mu_values = []
     mu_stds = []
     for cm_val in cm_values:
         if len(ne_params[m_label][cm_val]) > 0:
-            mus = np.array([x['mu_log_Ne'] for x in ne_params[m_label][cm_val]])
+            mus = np.array([x['mu_Ne'] for x in ne_params[m_label][cm_val]])
             mu_values.append(mus.mean())
             mu_stds.append(mus.std() / np.sqrt(len(mus)))
         else:
             mu_values.append(np.nan)
             mu_stds.append(0)
-    
-    ax_mu.errorbar(cm_values, mu_values, yerr=mu_stds, 
+
+    ax_mu.errorbar(cm_values, mu_values, yerr=mu_stds,
                    marker='o', label=m_label, linewidth=2, markersize=8)
 
-ax_mu.axhline(np.log(10000), color='red', ls='--', linewidth=2, label='True log(Ne)=log(10000)')
+ax_mu.axhline(10000, color='red', ls='--', linewidth=2, label='True Ne=10000')
 ax_mu.set_xlabel("Genome length (cM)", fontsize=12)
-ax_mu.set_ylabel("μ_log(Ne)", fontsize=12)
-ax_mu.set_title("Mean log(Ne) across genome lengths", fontsize=13, fontweight="bold")
+ax_mu.set_ylabel("μ_Ne", fontsize=12)
+ax_mu.set_title("Mean Ne across genome lengths", fontsize=13, fontweight="bold")
 ax_mu.legend(fontsize=10)
 ax_mu.grid(True, alpha=0.3)
 
-# Plot sigma_log_Ne
+# Plot sd_Ne
 ax_sigma = axes3[1]
 for m_idx, m_label in enumerate(model_labels):
     sigma_values = []
     sigma_stds = []
     for cm_val in cm_values:
         if len(ne_params[m_label][cm_val]) > 0:
-            sigmas = np.array([x['sigma_log_Ne'] for x in ne_params[m_label][cm_val]])
+            sigmas = np.array([x['sd_Ne'] for x in ne_params[m_label][cm_val]])
             sigma_values.append(sigmas.mean())
             sigma_stds.append(sigmas.std() / np.sqrt(len(sigmas)))
         else:
             sigma_values.append(np.nan)
             sigma_stds.append(0)
-    
+
     ax_sigma.errorbar(cm_values, sigma_values, yerr=sigma_stds,
                       marker='s', label=m_label, linewidth=2, markersize=8)
 
 ax_sigma.set_xlabel("Genome length (cM)", fontsize=12)
-ax_sigma.set_ylabel("σ_log(Ne)", fontsize=12)
-ax_sigma.set_title("Heterogeneity in log(Ne) across genome lengths", fontsize=13, fontweight="bold")
+ax_sigma.set_ylabel("sd_Ne", fontsize=12)
+ax_sigma.set_title("Heterogeneity in Ne across genome lengths", fontsize=13, fontweight="bold")
 ax_sigma.legend(fontsize=10)
 ax_sigma.grid(True, alpha=0.3)
 
@@ -728,6 +742,17 @@ fig3.tight_layout()
 fig3.savefig("ne_parameters_convergence.png", dpi=200, bbox_inches="tight")
 plt.show()
 print("Saved: ne_parameters_convergence.png")
+
+
+# ====================================================================
+# 6d. Plot 4: Parameter relative error (glike-style box plot)
+#     Mixed model, true topology, largest genome length.
+# ====================================================================
+plot_relative_error_boxplot(
+    dem_true, rel_err_stanvars, varying=True,
+    outpath="admix_thru_b_plus_ancient_relative_error.png",
+    title=f"Parameter relative error (Mixed, true topology, {REL_ERR_CM} cM)",
+)
 
 
 # ====================================================================

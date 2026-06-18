@@ -13,7 +13,6 @@ data {
     array[n_events - n_admixture] int<lower=1, upper=n_events+1> fixed_indices_shifted;
 
     // Fixed parameter block
-    real<lower=0> effective_N;   
     int<lower=0> n_leaf_pairs;
     array[n_leaf_pairs] int<lower=1, upper=n_leaves> pair_i;
     array[n_leaf_pairs] int<lower=1, upper=n_leaves> pair_j;
@@ -24,8 +23,9 @@ data {
 }
 
 parameters{
-    vector<lower = 1>[n_events] times;          
-    array[n_admixture] real<lower = 0, upper = 1> admixture_fractions; 
+    vector<lower = 1>[n_events] times;
+    array[n_admixture] real<lower = 0, upper = 1> admixture_fractions;
+    real<lower=0> effective_N;
 }
 
 transformed parameters{
@@ -123,8 +123,10 @@ transformed parameters{
 }
 
 model {
-    times ~ exponential(1.0/100);  
-    admixture_fractions ~ uniform(0,1);   
+    times ~ exponential(1.0/100);
+    admixture_fractions ~ beta(1.0,1.0);
+    // Gamma prior: mean 15000, sd 7500 (shape 4 => coefficient of variation 0.5)
+    effective_N ~ gamma(4.0, 4.0 / 15000.0);
 
     for (i in 1:n_leaves) {
         for (j in i:n_leaves) {

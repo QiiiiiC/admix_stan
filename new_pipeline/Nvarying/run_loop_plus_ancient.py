@@ -72,6 +72,7 @@ from ibd_jackknife import (
     resample_ibd_with_jackknife_variance,
 )
 from demography import DemographicTopology
+from relative_error import plot_relative_error_boxplot
 from cmdstanpy import CmdStanModel
 
 
@@ -118,6 +119,8 @@ CM_PER_UNIT = 1e-4
 RECOMB_RATE = 1e-6
 MUT_RATE = 1e-6
 SAMPLES_PER_POP = {'a': 15, 'b': 15, 'c': 15, 'd': 15}
+# Haploid sample count per population (diploid samples x ploidy 2)
+N_HAPLOID_PER_POP = {_p: 2 * _c for _p, _c in SAMPLES_PER_POP.items()}
 
 N_SIMS = 50
 SIM_CM_EACH = 50
@@ -171,7 +174,6 @@ T_ROOT       = 1500
 
 SNP_CUTOFF_TIME = T_ROOT
 SNP_MIN_MAF = 0.05
-FIXED_NE = NE_BASE
 
 
 # ====================================================================
@@ -351,6 +353,11 @@ admix_params = {
     for label in model_labels
 }
 
+# Per-replicate stan_variables() for the relative-error box plot:
+# Mixed model, true topology (ti == 0), largest genome length only.
+rel_err_stanvars = []
+REL_ERR_CM = cm_values[-1]
+
 rng = np.random.default_rng(seed=2025)
 
 for cm_val in cm_values:
@@ -390,7 +397,9 @@ for cm_val in cm_values:
 
                 init = {
                     "times": [100.0] * n_events_t,
-                    "Ne": [10000.0] * n_nodes_t,
+                    "mu_log": float(np.log(15000.0)),
+                    "sigma_log": 0.3,
+                    "Ne_raw": [0.0] * n_nodes_t,
                 }
                 if n_admix_t > 0:
                     init["admixture_fractions"] = [0.5] * n_admix_t
@@ -400,16 +409,16 @@ for cm_val in cm_values:
                 try:
                     if m_label == "IBD-only":
                         sd = build_ibd_stan_data(
-                            dem_infer, ibd_mean, ibd_var, bins,
+                            dem_infer, ibd_mean, ibd_var, bins, n_samples_per_pop=N_HAPLOID_PER_POP,
                             T_max=100000, cm=cm_val,
                         )
                     elif m_label == "SNP-only":
                         sd = build_snp_stan_data(
-                            dem_infer, w_hat, w_se, effective_N=FIXED_NE,
+                            dem_infer, w_hat, w_se,
                         )
                     else:
                         sd = build_mixed_stan_data(
-                            dem_infer, ibd_mean, ibd_var, bins, w_hat, w_se,
+                            dem_infer, ibd_mean, ibd_var, bins, w_hat, w_se, n_samples_per_pop=N_HAPLOID_PER_POP,
                             T_max=100000, cm=cm_val,
                         )
 
@@ -420,6 +429,12 @@ for cm_val in cm_values:
                     rep_elbos[ti] = extract_elbo(fit)
 
                     all_vars = fit.stan_variables()
+
+                    # Collect for the relative-error box plot.
+                    if (m_label == "Mixed" and ti == 0
+                            and cm_val == REL_ERR_CM):
+                        rel_err_stanvars.append(all_vars)
+
                     cum_t = all_vars['cumulative_times']
                     admix_f = all_vars.get('admixture_fractions', None)
                     pdict = {}
@@ -647,6 +662,17 @@ fig2.tight_layout(rect=[0, 0, 1, 0.96])
 fig2.savefig("loop_plus_ancient_params.png", dpi=200, bbox_inches="tight")
 plt.show()
 print("Saved: loop_plus_ancient_params.png")
+
+
+# ====================================================================
+# Parameter relative error (glike-style box plot)
+# Mixed model, true topology, largest genome length.
+# ====================================================================
+plot_relative_error_boxplot(
+    dem_true, rel_err_stanvars, varying=True,
+    outpath="loop_plus_ancient_relative_error.png",
+    title=f"Parameter relative error (Mixed, true topology, {REL_ERR_CM} cM)",
+)
 
 
 # ====================================================================
