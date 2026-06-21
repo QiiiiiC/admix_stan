@@ -153,7 +153,10 @@ def write_vcf_and_map(ts, output_dir: Path, prefix: str):
     map_path = output_dir / f"{prefix}.map"
 
     with open(vcf_path, "w") as f:
-        ts.write_vcf(f, contig_id="1")
+        # msprime can place a mutation at bp 0; VCF positions are 1-based, so
+        # shift all positions +1 (keeps every SNP within the [1, seq_len_bp]
+        # genetic map; 1 bp = 1e-6 cM, negligible for segment lengths).
+        ts.write_vcf(f, contig_id="1", position_transform=lambda x: np.asarray(x) + 1)
 
     seq_len_bp = int(ts.sequence_length)
     total_cm   = seq_len_bp * CM_PER_UNIT

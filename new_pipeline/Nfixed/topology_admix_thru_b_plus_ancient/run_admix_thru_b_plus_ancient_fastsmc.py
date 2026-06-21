@@ -183,7 +183,9 @@ def write_asmc_inputs(ts, output_dir: Path, prefix: str):
             # keep biallelic 0/1 sites only
             if row.max() > 1 or row.min() < 0:
                 continue
-            pos_bp = int(positions[s_idx])
+            # +1: positions are 1-based; a site at bp 0 trips FastSMC's
+            # "increasing physical position" check (0 vs the initial 0).
+            pos_bp = int(positions[s_idx]) + 1
             gts = " ".join("1" if v else "0" for v in row)
             fh.write(f"1:{pos_bp} SNP_{s_idx} {pos_bp} 1 2 {gts}\n")
             kept_bp.append(pos_bp)
