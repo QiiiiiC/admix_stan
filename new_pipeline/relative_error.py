@@ -150,6 +150,7 @@ def plot_relative_error_boxplot(dem_true, stan_vars_list, varying,
                boxprops=dict(facecolor="#9ecae1", edgecolor="k"),
                medianprops=dict(color="k"))
     ax.axhline(0.0, color="red", ls="--", lw=1.2)
+    ax.set_ylim(-1, 3)
     ax.set_xticks(range(1, n_par + 1))
     ax.set_xticklabels(names, rotation=45, ha="right", fontsize=9)
     ax.set_ylabel("Relative error  (estimate - truth) / truth", fontsize=11)
