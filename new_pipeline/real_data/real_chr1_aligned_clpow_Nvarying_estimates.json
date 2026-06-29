@@ -1,0 +1,141 @@
+{
+  "events": [
+    {
+      "event": 1,
+      "type": "ADMIXTURE",
+      "node": "AMR",
+      "parents": [
+        "AMR_eur",
+        "AMR_afr"
+      ],
+      "time_mean": 111.8560768472,
+      "time_sd": 107.85445377245458,
+      "frac_to_parent1": 0.5219336015789999,
+      "frac_to_parent1_sd": 0.2813225182831574,
+      "parent1": "AMR_eur"
+    },
+    {
+      "event": 2,
+      "type": "MERGE",
+      "node": "EUR2",
+      "children": [
+        "EUR",
+        "AMR_eur"
+      ],
+      "time_mean": 222.066456124,
+      "time_sd": 133.21582113962828
+    },
+    {
+      "event": 3,
+      "type": "MERGE",
+      "node": "AFR2",
+      "children": [
+        "AFR",
+        "AMR_afr"
+      ],
+      "time_mean": 337.2173804199999,
+      "time_sd": 164.84534868281455
+    },
+    {
+      "event": 4,
+      "type": "MERGE",
+      "node": "weur",
+      "children": [
+        "EUR2",
+        "SAS"
+      ],
+      "time_mean": 439.32698181,
+      "time_sd": 174.87033755501272
+    },
+    {
+      "event": 5,
+      "type": "MERGE",
+      "node": "ooa",
+      "children": [
+        "weur",
+        "EAS"
+      ],
+      "time_mean": 568.90136915,
+      "time_sd": 198.75774709824609
+    },
+    {
+      "event": 6,
+      "type": "MERGE",
+      "node": "root",
+      "children": [
+        "AFR2",
+        "ooa"
+      ],
+      "time_mean": 662.4088242800001,
+      "time_sd": 222.01090651486638
+    }
+  ],
+  "effective_sizes": {
+    "AFR": {
+      "Ne_haploid_mean": 18889.496370099998,
+      "Ne_haploid_sd": 8737.84154912999
+    },
+    "AMR": {
+      "Ne_haploid_mean": 16483.383174200004,
+      "Ne_haploid_sd": 6341.852208344633
+    },
+    "EAS": {
+      "Ne_haploid_mean": 19495.505641199998,
+      "Ne_haploid_sd": 8849.70374019297
+    },
+    "EUR": {
+      "Ne_haploid_mean": 18269.6365862,
+      "Ne_haploid_sd": 8497.198094917265
+    },
+    "SAS": {
+      "Ne_haploid_mean": 19000.844786899997,
+      "Ne_haploid_sd": 13115.700066720708
+    },
+    "AMR_eur": {
+      "Ne_haploid_mean": 17055.4914264,
+      "Ne_haploid_sd": 6568.83452025086
+    },
+    "AMR_afr": {
+      "Ne_haploid_mean": 17369.738224700002,
+      "Ne_haploid_sd": 9423.495220537909
+    },
+    "EUR2": {
+      "Ne_haploid_mean": 16765.587035999997,
+      "Ne_haploid_sd": 7413.635876728767
+    },
+    "AFR2": {
+      "Ne_haploid_mean": 16584.6017057,
+      "Ne_haploid_sd": 7045.002623768969
+    },
+    "weur": {
+      "Ne_haploid_mean": 18442.313831800002,
+      "Ne_haploid_sd": 7327.854889681783
+    },
+    "ooa": {
+      "Ne_haploid_mean": 16955.7753724,
+      "Ne_haploid_sd": 7333.49162660512
+    },
+    "root": {
+      "Ne_haploid_mean": 17152.8648216,
+      "Ne_haploid_sd": 7042.18761101123
+    }
+  },
+  "cl_power": {
+    "mean": 7.637317067905999e-08,
+    "sd": 8.929860249951565e-08
+  },
+  "_meta": {
+    "topology": "amr_2way_recent",
+    "model": "mixed",
+    "nmodel": "Nvarying",
+    "data": "real_chr1_aligned",
+    "pop_order": [
+      "AFR",
+      "AMR",
+      "EAS",
+      "EUR",
+      "SAS"
+    ],
+    "t_max": 100000.0
+  }
+}

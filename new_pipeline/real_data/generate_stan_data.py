@@ -7,8 +7,11 @@ which all operate on simulated ``tskit`` tree sequences.  Here the same two data
 products are produced directly from the files in ``real_data/merged_pruned``:
 
   1. SNP covariance  (w_hat, w_se)   -- the double-centered TreeMix covariance,
-     computed exactly as ``inference_methods.calculate_treemix_covariance`` does,
-     but fed a per-population allele-frequency matrix read from the phased VCFs.
+     computed by exactly the same estimator the simulation runs use,
+     ``inference_methods.resample_snp_covariance`` (pooled "ratio of sums"
+     TreeMix normalization + 1/n_haploid finite-sample bias correction +
+     sub-block jackknife SE), fed a per-population allele-frequency matrix read
+     from the phased VCFs.
 
   2. IBD sharing fractions (ibd_mean, ibd_var) per length bin -- IBD segments
      called by hap-IBD / FastSMC are binned by genetic length and turned into
@@ -67,20 +70,23 @@ from collections import defaultdict
 
 import numpy as np
 
-# Reuse the existing SNP covariance estimator so the real-data SNP product is
-# computed by exactly the same code path as the simulation pipeline.
+# Reuse the new-pipeline SNP covariance estimator so the real-data SNP product
+# is computed by exactly the same code path as the simulation run files
+# (resample_snp_covariance), not the older per-SNP-standardized variant.
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _PARENT = os.path.dirname(_THIS_DIR)
 if _PARENT not in sys.path:
     sys.path.insert(0, _PARENT)
-from inference_methods import calculate_treemix_covariance  # noqa: E402
+from inference_methods import resample_snp_covariance  # noqa: E402
 
 
-# Default genome-wide length bins (cM), matching the simulation runners.
+# Default genome-wide length bins (cM), matching the simulation run files
+# exactly (1.0 cM lower edge .. 50 cM) so real- and simulated-data parameter
+# recovery use the same bins.
 DEFAULT_BINS = [
-    [0.5, 0.55], [0.55, 0.6], [0.6, 0.65], [0.65, 0.7], [0.7, 0.8],
-    [0.8, 0.9], [0.9, 1.0], [1.0, 1.5], [1.5, 2.0], [2.0, 5.0],
-    [5.0, 8.0], [8.0, 20.0], [20.0, 50.0],
+    [1.0, 1.25], [1.25, 1.5], [1.5, 1.75], [1.75, 2.0], [2.0, 2.5],
+    [2.5, 3.0], [3.0, 4.0], [4.0, 5.0], [5.0, 6.0], [6.0, 7.5],
+    [7.5, 12.0], [12.0, 20.0], [20.0, 300],
 ]
 
 DEFAULT_POP_ORDER = ["AFR", "AMR", "EAS", "EUR", "SAS"]
@@ -280,13 +286,44 @@ def compute_allele_freq_matrix(vcf_paths, sample_names, sample_to_pop, pop_order
 
 
 def compute_snp_covariance(vcf_paths, sample_names, sample_to_pop, pop_order,
-                           block_size_snps=500, min_maf=0.0, max_sites=None):
-    """Build (w_hat, w_se) via the existing TreeMix covariance estimator."""
+                           n_haps, se_block_size=500, min_maf=0.0,
+                           max_sites=None):
+    """Build (w_hat, w_se) with the SAME estimator the simulation runs use.
+
+    This mirrors ``inference_methods.resample_snp_covariance`` exactly -- the
+    pooled TreeMix "ratio of sums" covariance ``sum(dev_i dev_j) / sum(het)``,
+    the 1/n_haploid finite-sample bias correction, and the ``se_block_size``-SNP
+    sub-block jackknife SE -- rather than the per-SNP-standardized
+    ``calculate_treemix_covariance``.  Per-SNP deviations are formed against the
+    cross-population mean (``mu = mean over pops``), exactly as
+    ``inference_methods.prepare_snp_blocks`` does for the simulated data.
+
+    For a full real genome we use every SNP once (no block resampling), so the
+    (dev, het) pairs are handed over as a single genome-wide block:
+    ``resample_snp_covariance`` re-chunks the concatenation into ``se_block_size``
+    sub-blocks for the jackknife SE regardless, so this reproduces the run-file
+    estimate exactly.
+    """
     F = compute_allele_freq_matrix(
         vcf_paths, sample_names, sample_to_pop, pop_order, max_sites=max_sites
     )
-    w_hat, w_se = calculate_treemix_covariance(
-        F, block_size_snps=block_size_snps, min_maf=min_maf
+
+    # Pooled (cross-population) mean per SNP, matching prepare_snp_blocks.
+    mu = np.nanmean(F, axis=1)
+    valid = (
+        (mu > min_maf) & (mu < 1.0 - min_maf)
+        & ~np.isnan(mu) & ~np.isnan(F).any(axis=1)
+    )
+    dev = F[valid] - mu[valid, None]          # (n_snps, n_pops) deviations
+    het = mu[valid] * (1.0 - mu[valid])       # (n_snps,) heterozygosities
+    print(f"[snp] {int(valid.sum())}/{F.shape[0]} SNPs kept after MAF filter "
+          f"(min_maf={min_maf})")
+
+    snp_blocks = [(dev, het)]                  # one genome-wide block
+    w_hat, w_se = resample_snp_covariance(
+        snp_blocks, chosen_blocks=[0],
+        n_haploid_per_pop=np.asarray(n_haps, dtype=float),
+        se_block_size=se_block_size,
     )
     print(f"[snp] w_hat range [{w_hat.min():.3e}, {w_hat.max():.3e}], "
           f"w_se range [{w_se.min():.3e}, {w_se.max():.3e}]")
@@ -325,7 +362,7 @@ def _run_cmd(cmd, quiet=True):
     return res
 
 
-def run_hapibd(vcf_path, map_path, out_prefix, min_seed=2.0,
+def run_hapibd(vcf_path, map_path, out_prefix, min_seed=DEFAULT_MIN_CM,
                min_output=DEFAULT_MIN_CM, threads=1, quiet=True):
     """
     Run hap-IBD on a real (bgzipped) VCF + PLINK genetic map.
@@ -944,13 +981,15 @@ def main():
     ap.add_argument("--out", default=os.path.join(_THIS_DIR, "real_stan_data"),
                     help="Output prefix (writes <prefix>.npz and <prefix>.json)")
     ap.add_argument("--pop-order", nargs="+", default=DEFAULT_POP_ORDER)
-    ap.add_argument("--block-size-snps", type=int, default=500)
+    ap.add_argument("--block-size-snps", type=int, default=500,
+                    help="SNPs per sub-block for the TreeMix covariance "
+                         "jackknife SE (resample_snp_covariance se_block_size).")
     ap.add_argument("--min-maf", type=float, default=0.0)
     ap.add_argument("--max-sites", type=int, default=None,
                     help="Cap on number of SNP sites (debugging).")
     ap.add_argument("--min-cm", type=float, default=DEFAULT_MIN_CM,
                     help="Minimum reported IBD segment length (cM).")
-    ap.add_argument("--hapibd-min-seed", type=float, default=2.0,
+    ap.add_argument("--hapibd-min-seed", type=float, default=DEFAULT_MIN_CM,
                     help="hap-IBD min-seed length (cM).")
     ap.add_argument("--threads", type=int, default=1,
                     help="Threads for the IBD caller.")
@@ -994,8 +1033,8 @@ def main():
     w_hat = w_se = None
     if not args.skip_snp:
         w_hat, w_se = compute_snp_covariance(
-            vcf_paths, sample_names, sample_to_pop, pop_order,
-            block_size_snps=args.block_size_snps, min_maf=args.min_maf,
+            vcf_paths, sample_names, sample_to_pop, pop_order, n_haps,
+            se_block_size=args.block_size_snps, min_maf=args.min_maf,
             max_sites=args.max_sites,
         )
 
