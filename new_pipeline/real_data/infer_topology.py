@@ -93,8 +93,6 @@ def build_init(dem, model, varying):
     else:
         # Nfixed: single shared effective size.
         init["effective_N"] = 15000.0
-    if model in ("mixed", "ibd"):
-        init["cl_power"] = 0.5
     return init
 
 
@@ -165,9 +163,6 @@ def extract_estimates(dem, sv, varying):
     if "kappa_snp" in sv:
         k = np.asarray(sv["kappa_snp"], dtype=float)
         out["kappa_snp"] = {"mean": float(k.mean()), "sd": float(k.std())}
-    if "cl_power" in sv:
-        c = np.asarray(sv["cl_power"], dtype=float)
-        out["cl_power"] = {"mean": float(c.mean()), "sd": float(c.std())}
     return out
 
 
@@ -223,9 +218,9 @@ def print_report(dem, est, varying):
     if "kappa_snp" in est:
         print(f"\nkappa_snp: {est['kappa_snp']['mean']:.3f} +/- "
               f"{est['kappa_snp']['sd']:.3f}")
-    if "cl_power" in est:
-        print(f"\ncl_power (global composite-likelihood power): "
-              f"{est['cl_power']['mean']:.4f} +/- {est['cl_power']['sd']:.4f}")
+    if "_meta" in est and "cl_power" in est["_meta"]:
+        print(f"\ncl_power (fixed global composite-likelihood power): "
+              f"{est['_meta']['cl_power']:g}")
 
 
 # ----------------------------------------------------------------------
@@ -275,6 +270,11 @@ def main():
                          "next to real ibd_hat (~1e-5); raising it (e.g. 1e-6) "
                          "softens the over-sharp IBD Gaussian that can cause "
                          "non-finite gradients on real data.")
+    ap.add_argument("--cl-power", type=float, default=1e-3,
+                    help="Fixed global composite-likelihood power c in (0,1] "
+                         "(mixed/ibd models). Tempers every independent log-density "
+                         "term to correct composite-likelihood overconfidence. A "
+                         "learned c rails to 0, so it is fixed/profiled here.")
     ap.add_argument("--out", default=None,
                     help="Output prefix (default: <data>_fit).")
     # --- optional end-to-end data generation ---
@@ -317,6 +317,9 @@ def main():
     stan_data = assemble_stan_data(
         dem, npz_path, json_path, model=args.model, T_max=args.t_max,
     )
+    if args.model in ("mixed", "ibd"):
+        stan_data["cl_power"] = args.cl_power
+        print(f"[cl_power] fixed composite-likelihood power c = {args.cl_power:g}")
 
     # 4. compile + Pathfinder fit
     stan_path = stan_file_for(args.model, varying)
@@ -332,7 +335,8 @@ def main():
     est = extract_estimates(dem, sv, varying)
     est["_meta"] = {"topology": args.topology, "model": args.model,
                     "nmodel": args.nmodel, "data": args.data,
-                    "pop_order": list(args.pop_order), "t_max": args.t_max}
+                    "pop_order": list(args.pop_order), "t_max": args.t_max,
+                    "cl_power": args.cl_power}
     print_report(dem, est, varying)
 
     est_path = out_prefix + "_estimates.json"
