@@ -987,6 +987,11 @@ def main():
     ap.add_argument("--min-maf", type=float, default=0.0)
     ap.add_argument("--max-sites", type=int, default=None,
                     help="Cap on number of SNP sites (debugging).")
+    ap.add_argument("--bins-uniform", nargs=3, type=float, default=None,
+                    metavar=("LO", "HI", "WIDTH"),
+                    help="Use uniform-width length bins from LO to HI cM with "
+                         "step WIDTH (e.g. '2 20.5 0.5' for HapNe-style bins). "
+                         "Overrides the default unequal bins.")
     ap.add_argument("--min-cm", type=float, default=DEFAULT_MIN_CM,
                     help="Minimum reported IBD segment length (cM).")
     ap.add_argument("--hapibd-min-seed", type=float, default=DEFAULT_MIN_CM,
@@ -1011,7 +1016,13 @@ def main():
     labels = args.labels or os.path.join(data_dir, "population_labels_simple.txt")
     genmap_dir = args.genmap_dir or os.path.join(data_dir, "genmap")
     pop_order = args.pop_order
-    bins = DEFAULT_BINS
+    if args.bins_uniform:
+        lo, hi, w = args.bins_uniform
+        edges = np.arange(lo, hi + 1e-9, w)
+        bins = [[float(edges[k]), float(edges[k + 1])] for k in range(len(edges) - 1)]
+        print(f"[bins] uniform {lo}-{hi} cM, width {w}: {len(bins)} bins")
+    else:
+        bins = DEFAULT_BINS
 
     if args.vcf_glob:
         vcf_glob = args.vcf_glob
