@@ -6,16 +6,16 @@
     "SAS"
   ],
   "n_haps": [
-    1322,
-    1008,
-    1006,
-    978
+    714,
+    636,
+    808,
+    464
   ],
   "n_samples_per_pop": {
-    "AFR": 1322,
-    "EAS": 1008,
-    "EUR": 1006,
-    "SAS": 978
+    "AFR": 714,
+    "EAS": 636,
+    "EUR": 808,
+    "SAS": 464
   },
   "bins": [
     [
@@ -167,7 +167,7 @@
       20.5
     ]
   ],
-  "genome_cm": 3371.933102012699,
+  "genome_cm": 286.279234,
   "has_snp": true,
   "has_ibd": true,
   "arrays_in_npz": [
