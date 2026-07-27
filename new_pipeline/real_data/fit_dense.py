@@ -68,6 +68,35 @@ FWD = {"fixed": CmdStanModel(stan_file=_find_model("ibd_model_Nfixed.stan")),
        "epoch": CmdStanModel(stan_file=_find_model("ibd_model_Nepoch.stan"))}
 
 
+def smooth_tree_data(dem):
+    """Tree structure for the Nsmooth log-Ne random walk, in dem.nodes order
+    (1-based node indices).  Each non-root node points at the branch it flows
+    into going backwards in time: a single parent (MERGE child) or, for an
+    admixture source node, its admixture index (two parents via admixture_map)."""
+    names = list(dem.nodes.keys())
+    idx = {nm: i + 1 for i, nm in enumerate(names)}
+    N = len(names)
+    ne_parent = [0] * N
+    ne_admix_idx = [0] * N
+    ne_start_event = [0] * N
+    a_i = 0
+    for k, ev in enumerate(dem.ordered_events):
+        ev_no = k + 1                                     # matches cumulative_times[ev_no]
+        if ev["type"] == "MERGE":
+            P = ev["parent"]; c1, c2 = ev["children"]
+            ne_start_event[idx[P] - 1] = ev_no
+            ne_parent[idx[c1] - 1] = idx[P]
+            ne_parent[idx[c2] - 1] = idx[P]
+        else:                                             # ADMIXTURE
+            a_i += 1
+            X = ev["child"]; s1, s2 = ev["parents"]
+            ne_start_event[idx[s1] - 1] = ev_no
+            ne_start_event[idx[s2] - 1] = ev_no
+            ne_admix_idx[idx[X] - 1] = a_i
+    return {"ne_parent": ne_parent, "ne_admix_idx": ne_admix_idx,
+            "ne_start_event": ne_start_event}
+
+
 def make_init(kind, kappa, NE_EV, NE_ADM, N_NODES, N_EPOCH):
     init = {"times": [100.0]*NE_EV, "admixture_fractions": [0.5]*NE_ADM}
     if kind == "fixed":
@@ -194,6 +223,8 @@ def run(tag, prefix, out_dir, sfx=""):
     ibd_data   = IT.assemble_stan_data(dem, prefix+".npz", prefix+".json", model="ibd",   T_max=IT.DEFAULT_T_MAX)
     mixed_data = IT.assemble_stan_data(dem, prefix+".npz", prefix+".json", model="mixed", T_max=IT.DEFAULT_T_MAX)
     snp_data   = IT.assemble_stan_data(dem, prefix+".npz", prefix+".json", model="snp",   T_max=IT.DEFAULT_T_MAX)
+    tree = smooth_tree_data(dem)                 # Nsmooth needs the parent/edge structure
+    ibd_data.update(tree); mixed_data.update(tree)
     NE_EV, NE_ADM, N_NODES = ibd_data["n_events"], ibd_data["n_admixture"], ibd_data["n_nodes"]
     N_EPOCH = NE_EV + 1
     DATA = {"ibd": ibd_data, "mixed": mixed_data, "snp": snp_data}

@@ -10,15 +10,26 @@ population, by two independent signals:
             cM within the population) -- recent-relatedness / endogamy structure.
   (b) SNP:  cluster individuals on pruned-SNP genotype PCA -- ancestry structure.
 
-For each population and each method it runs PCA -> K-means (K chosen by silhouette,
-K=1 if no structure) and keeps the LARGEST cluster.  Outputs two label files
-(same 2-column '<sample> <POP>' format as the input) that SLICE the data when
-passed to generate_stan_data.py --labels:
+The two signals need different machinery, because they are different objects:
+
+  SNP:  genotypes are a real individuals x markers DATA matrix, so the standard
+        popgen recipe applies -- standardize markers, PCA (Patterson, Price &
+        Reich 2006; scores kept at natural scale, NOT whitened), then K-means
+        with K chosen by silhouette.
+  IBD:  co-ancestry is an n x n SIMILARITY matrix with no coordinate space, so
+        it is clustered as a GRAPH: Louvain modularity, normalized-Laplacian
+        spectral clustering, and (for reference) DBSCAN on PC scores.  All three
+        run every time; --ibd-cluster picks which writes the labels.
+
+Both keep the LARGEST cluster.  If the 1000G panel file is present, every
+partition is scored against the reported subpopulations (ARI/AMI) -- see the
+[truth] block, and note that the SNP route currently beats all IBD routes.
 
   <out>_ibd.txt   individuals selected by IBD clustering
   <out>_snp.txt   individuals selected by SNP clustering
-  <out>_clusters.png   PC1-PC2 scatter per population/method (diagnostic)
-  <out>_summary.json   cluster sizes and selections
+  <out>_clusters.png   IBD: co-ancestry enrichment heatmaps reordered by cluster
+                       (red diagonal blocks = real communities); SNP: PC scatter
+  <out>_summary.json   cluster sizes, selections, agreement with the panel
 
 Then regenerate + fit, e.g.:
   PY=/opt/miniconda3/envs/genetics_env/bin/python
@@ -37,7 +48,11 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from scipy.cluster.vq import kmeans2
+import networkx as nx
+from sklearn.cluster import DBSCAN, KMeans
+from sklearn.metrics import (silhouette_score, adjusted_rand_score,
+                             adjusted_mutual_info_score)
+from sklearn.neighbors import NearestNeighbors
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -64,8 +79,21 @@ def vcf_sample_order(vcf):
     return []
 
 
-def load_ibd_coancestry(ibd_glob, pop_members):
+def load_ibd_coancestry(ibd_glob, pop_members, min_cm=1.0, max_cm=np.inf):
     """Per population, summed shared cM between each pair of its individuals.
+
+    Only segments with min_cm <= length < max_cm contribute.  Segment length is a
+    clock: a segment of L cM has expected TMRCA ~ 100/(2L) generations, so the
+    bin selects the time depth the co-ancestry matrix describes.  >10 cM is
+    pedigree relatedness; the SHORT end is where subpopulation structure lives.
+
+    Keep the floor at 1 cM (what hap-ibd emits here).  The 1-2 cM class looks
+    unattractive -- 79% of segments, the highest false-discovery rate -- but it
+    is also the deepest, ~50 generations, and 1000G subpopulations diverged
+    further back than the ~25 generations a 2 cM segment reaches.  Measured
+    against the reported subpopulations, moving the floor 2 cM -> 1 cM lifts mean
+    AMI from 0.47 to 0.63, and EAS/Louvain from ARI 0.02 to 0.76.  Raising this
+    throws the signal away.
 
     pop_members : {pop: [sample, ...]}   ->   {pop: n x n float matrix}
     """
@@ -79,6 +107,8 @@ def load_ibd_coancestry(ibd_glob, pop_members):
             for line in fh:
                 c = line.split()
                 s1, s2, L = c[0], c[2], float(c[7])
+                if L < min_cm or L >= max_cm:
+                    continue
                 p = sample_pop.get(s1)
                 if p is None or sample_pop.get(s2) != p:
                     continue                       # cross-pop or unlisted
@@ -132,80 +162,275 @@ def load_genotypes(vcf_glob, want, max_snps, stride):
 # PCA + clustering
 # ----------------------------------------------------------------------
 def pca(X, k):
-    """Standardize columns, return top-k principal-component scores."""
+    """Normalize FEATURES, return top-k PC scores at their natural scale.
+
+    This is the standard population-genetics PCA (Patterson, Price & Reich 2006;
+    smartpca / plink --pca): each marker/column is centred and divided by its own
+    standard deviation, then the scores are U*S -- eigenvector times sqrt of
+    eigenvalue.
+
+    Do NOT rescale the PC *scores* to unit variance.  The relative scale of the
+    axes is the signal: an axis' singular value is how much population
+    differentiation it carries, so it should down-weight itself as it decays into
+    the noise bulk.  Whitening throws that away and promotes every retained noise
+    axis to the same weight as PC1 -- measured here, it destroyed all structure
+    by k=5, while the unwhitened scores stay stable out to k=20.
+
+    Returns (n x k scores, explained-variance ratio of every PC).
+    """
     Xc = X - X.mean(0)
     sd = Xc.std(0); sd[sd == 0] = 1.0
     Xs = Xc / sd
     U, S, _ = np.linalg.svd(Xs, full_matrices=False)
+    ev = (S ** 2) / (S ** 2).sum()
     k = min(k, U.shape[1])
-    return U[:, :k] * S[:k]
-
-
-def silhouette(X, lab):
-    """Mean silhouette over points (euclidean, in feature space)."""
-    ks = np.unique(lab)
-    if ks.size < 2:
-        return -1.0
-    D = np.sqrt(((X[:, None, :] - X[None, :, :]) ** 2).sum(-1))
-    sil = np.zeros(len(X))
-    for i in range(len(X)):
-        same = lab == lab[i]; same[i] = False
-        a = D[i, same].mean() if same.any() else 0.0
-        b = min(D[i, lab == c].mean() for c in ks if c != lab[i])
-        sil[i] = 0.0 if max(a, b) == 0 else (b - a) / max(a, b)
-    return float(sil.mean())
+    return U[:, :k] * S[:k], ev
 
 
 def strip_outliers(feat, n_mad=6.0, ndim=5):
-    """Robust inlier mask: drop points > n_mad robust-z on any top PC.
+    """Robust inlier mask: drop points > n_mad robust-z on any of the top PCs.
 
-    Uses per-dimension median / MAD on the top `ndim` PCs, so a single extreme
-    sample (e.g. a bad genotype vector) can't dominate the K-means / silhouette.
+    K-means has no noise class, so one extreme sample (a bad genotype vector, a
+    lone recent migrant) drags a centroid onto itself.  Per-dimension median/MAD
+    on the leading PCs removes those before fitting.
     """
     d = min(ndim, feat.shape[1])
     X = feat[:, :d]
     med = np.median(X, 0)
     mad = np.median(np.abs(X - med), 0) * 1.4826 + 1e-9
-    z = np.abs(X - med) / mad
-    return z.max(1) <= n_mad
+    return (np.abs(X - med) / mad).max(1) <= n_mad
 
 
-def choose_clusters(feat, kmax, sil_thresh, seed, min_frac=0.10, n_mad=6.0):
-    """Robust PCA-space K-means.
+def kmeans_pcs(feat, kmax=8, sil_thresh=0.10, seed=0, min_frac=0.10, n_mad=6.0):
+    """PCA-space K-means with K chosen by silhouette -- the standard SNP recipe.
 
-    (1) strip extreme outliers (label -1 = dropped);
-    (2) K-means for K=2..kmax on the inliers, but only accept a split whose
-        SMALLEST cluster is >= min_frac of the inliers (kills trivial
-        outlier-only splits like 486/3);
-    (3) pick the K with best silhouette; K=1 (all inliers one cluster) if none
-        beats sil_thresh.
+    Genotypes are a real data matrix, so the pipeline is the textbook one:
+    standardize markers -> PCA -> K-means on the unwhitened PC scores.
 
-    Returns (labels over all n points with -1 for outliers, best_k, best_sil).
+    Two guards, both needed because K-means partitions EVERY point:
+      (1) strip MAD outliers first (labelled -1), so they cannot capture centroids;
+      (2) reject any K whose smallest cluster is under min_frac of the inliers.
+    Without (2) silhouette runs away to large K, because a cluster holding one
+    isolated outlier scores near 1.0 and drags the mean up -- unguarded this gave
+    AFR K=7 with clusters of size 4 and 2, and shrank the kept set to 231/661.
+
+    Returns (labels with -1 for outliers, K, silhouette).
     """
     n = len(feat)
     labels = np.full(n, -1)
     inlier = strip_outliers(feat, n_mad)
     idx = np.where(inlier)[0]
     fin = feat[inlier]
-    if len(fin) < 10:
+    if len(fin) < 20:
         labels[inlier] = 0
         return labels, 1, 0.0
     min_size = max(5, int(min_frac * len(fin)))
     best = (None, 1, -1.0)
     for K in range(2, min(kmax, len(fin) // min_size) + 1):
-        _, lab = kmeans2(fin, K, minit="++", seed=seed, missing="warn")
-        if len(np.unique(lab)) < K:                       # collapsed
+        lab = KMeans(n_clusters=K, n_init=10, random_state=seed).fit_predict(fin)
+        if len(np.unique(lab)) < K:                        # collapsed
             continue
         if np.bincount(lab, minlength=K).min() < min_size:  # trivial split
             continue
-        s = silhouette(fin, lab)
+        s = float(silhouette_score(fin, lab))
         if s > best[2]:
             best = (lab, K, s)
-    if best[0] is None or best[2] < sil_thresh:           # no real structure
+    if best[0] is None or best[2] < sil_thresh:
         labels[inlier] = 0
         return labels, 1, (best[2] if best[0] is not None else 0.0)
-    labels[idx] = best[0]
+    order = np.argsort(-np.bincount(best[0], minlength=best[1]))
+    remap = np.empty(best[1], int); remap[order] = np.arange(best[1])
+    labels[idx] = remap[best[0]]
     return labels, best[1], best[2]
+
+
+def knee_eps(feat, min_samples):
+    """DBSCAN eps from the k-distance knee (Ester et al. 1996).
+
+    Sort every point's distance to its `min_samples`-th nearest neighbour; the
+    curve is flat over the dense core and turns up sharply where the sparse tail
+    begins.  Take the knee = the point furthest from the chord joining the two
+    ends of the sorted curve.
+    """
+    k = min(min_samples, len(feat) - 1)
+    nn = NearestNeighbors(n_neighbors=k + 1).fit(feat)   # +1: self is neighbour 0
+    d = np.sort(nn.kneighbors(feat)[0][:, k])
+    x = np.arange(len(d), dtype=float)
+    # distance from each (x, d) to the chord (x0,d0)-(x1,d1), unnormalised
+    dx, dy = x[-1] - x[0], d[-1] - d[0]
+    norm = np.hypot(dx, dy)
+    if norm < 1e-12:
+        return float(d[-1]) if d[-1] > 0 else 1.0
+    off = np.abs(dy * (x - x[0]) - dx * (d - d[0])) / norm
+    eps = float(d[int(np.argmax(off))])
+    return eps if eps > 0 else float(d[d > 0].min() if (d > 0).any() else 1.0)
+
+
+def cluster_dbscan(feat, min_samples, eps=None):
+    """DBSCAN on whitened PC scores.
+
+    Unlike K-means there is no K to choose and no separate outlier pass: points
+    in low-density regions come back as noise (-1), which is exactly the
+    admixed / related stragglers we want out of the panmictic leaf.
+
+    Returns (labels with -1 = noise, n_clusters, mean silhouette over non-noise,
+    eps actually used).
+    """
+    n = len(feat)
+    if n < min_samples + 1:
+        return np.zeros(n, int), 1, 0.0, float("nan")
+    e = knee_eps(feat, min_samples) if eps is None else eps
+    lab = DBSCAN(eps=e, min_samples=min_samples).fit_predict(feat)
+    ks = np.unique(lab[lab >= 0])
+    if ks.size == 0:                                  # eps too tight: all noise
+        return np.zeros(n, int), 1, 0.0, e
+    sil = 0.0
+    if ks.size > 1:
+        m = lab >= 0
+        sil = float(silhouette_score(feat[m], lab[m]))
+    return lab, int(ks.size), sil, e
+
+
+# ----------------------------------------------------------------------
+# IBD graph clustering (operates on the co-ancestry matrix directly)
+# ----------------------------------------------------------------------
+def louvain_clusters(W, resolution=1.0, seed=0):
+    """Louvain modularity communities on the weighted IBD graph.
+
+    Nodes are individuals, edge weight = total shared cM.  Modularity is
+
+        Q = 1/2m * sum_ij [ w_ij - k_i k_j / 2m ] delta(c_i, c_j)
+
+    and the k_i k_j / 2m term is a configuration-model null: it asks whether i
+    and j share MORE than expected given how much each shares overall.  That
+    degree correction is why the raw matrix needs no hand-scaling -- individuals
+    differ in total sharing through phasing quality and through genuine endogamy,
+    and row-normalising would delete the second (real) effect along with the
+    first.  Han et al. 2017 (Nat Commun) cluster 770k genomes this way.
+
+    Returns integer labels (no noise class; every node joins a community).
+    """
+    G = nx.Graph()
+    G.add_nodes_from(range(len(W)))
+    iu = np.triu_indices(len(W), 1)
+    w = W[iu]
+    nz = w > 0
+    G.add_weighted_edges_from(zip(iu[0][nz], iu[1][nz], w[nz]))
+    comms = nx.community.louvain_communities(G, weight="weight",
+                                             resolution=resolution, seed=seed)
+    comms = sorted(comms, key=len, reverse=True)
+    lab = np.zeros(len(W), int)
+    for c, nodes in enumerate(comms):
+        for i in nodes:
+            lab[i] = c
+    return lab
+
+
+def knn_sparsify(W, n_neighbors=20):
+    """Keep each node's strongest n_neighbors edges, then symmetrise (OR-rule).
+
+    Spectral clustering needs a SPARSE affinity.  On a fully connected graph the
+    normalized Laplacian has one zero eigenvalue and the rest spread smoothly, so
+    the spectrum shows no block structure and the eigengap is uninformative --
+    every population came back as a single cluster before this step.  von Luxburg
+    (2007) recommends a k-NN graph for exactly this reason.
+    """
+    n = len(W)
+    k = min(n_neighbors, n - 1)
+    keep = np.zeros_like(W, dtype=bool)
+    nb = np.argpartition(-W, k, axis=1)[:, :k]
+    keep[np.arange(n)[:, None], nb] = True
+    keep |= keep.T                          # OR-rule symmetrisation
+    return np.where(keep, W, 0.0)
+
+
+def spectral_clusters(W, kmax=8, n_neighbors=20, seed=0):
+    """Normalized-Laplacian spectral clustering (Ng-Jordan-Weiss 2002).
+
+    L_sym = I - D^-1/2 W D^-1/2 on a k-NN-sparsified affinity; the number of
+    clusters comes from the eigengap, then k-means on the row-normalised bottom-k
+    eigenvectors.  D^-1/2 on both sides is the same degree correction modularity
+    gets from its null model.
+
+    This is the correct eigen-method for a similarity matrix -- note it is NOT
+    what an SVD of the raw co-ancestry matrix computes, since that treats rows of
+    a similarity matrix as if they were feature vectors.
+
+    Returns (labels, k chosen by the eigengap).
+    """
+    n = len(W)
+    W = knn_sparsify(W, n_neighbors)
+    d = W.sum(1)
+    d[d <= 0] = 1e-12                       # isolated nodes: keep them finite
+    dis = 1.0 / np.sqrt(d)
+    L = np.eye(n) - (W * dis[:, None]) * dis[None, :]
+    vals, vecs = np.linalg.eigh(L)          # ascending, L_sym is symmetric PSD
+    # Eigengap over k >= 2.  The k=1 gap (lambda_1 - lambda_0) is always large --
+    # lambda_0 is the trivial 0 of a connected graph -- so including it would
+    # answer "one cluster" every time regardless of the structure present.
+    top = min(kmax + 1, n - 1)
+    gaps = vals[2:top] - vals[1:top - 1]
+    if gaps.size == 0:
+        return np.zeros(n, int), 1
+    k = int(np.argmax(gaps)) + 2
+    U = vecs[:, :k]
+    rn = np.linalg.norm(U, axis=1, keepdims=True); rn[rn < 1e-12] = 1.0
+    lab = KMeans(n_clusters=k, n_init=10, random_state=seed).fit_predict(U / rn)
+    # relabel so cluster 0 is the largest, matching louvain_clusters
+    order = np.argsort(-np.bincount(lab, minlength=k))
+    remap = np.empty(k, int); remap[order] = np.arange(k)
+    return remap[lab], k
+
+
+def plot_coancestry_blocks(ax, W, lab, title):
+    """Reordered co-ancestry heatmap -- the honest view of an n x n matrix.
+
+    The IBD data has no coordinate space: it is one similarity per pair, so a
+    2-D scatter of PC scores is a projection of something that was never a point
+    cloud.  Sorting rows/columns by cluster and showing the matrix directly is
+    what fineSTRUCTURE plots.
+
+    What is plotted is ENRICHMENT, log2 of W_ij / (k_i k_j / 2m), not raw sharing.
+    Raw co-ancestry has almost no visible contrast: every pair in a population
+    shares a large common baseline, and individuals differ several-fold in total
+    sharing, so rows stripe by degree and the blocks wash out.  Dividing by the
+    configuration-model expectation -- the same null Louvain's modularity uses --
+    removes both effects and leaves "more/less than expected for these two".  Red
+    diagonal blocks against a blue off-diagonal is a real partition.
+    """
+    order = np.concatenate([np.where(lab == c)[0] for c in
+                            sorted(set(lab), key=lambda c: -(lab == c).sum())])
+    k = W.sum(1); m = W.sum() / 2.0
+    E = np.outer(k, k) / (2 * m) if m > 0 else np.ones_like(W)
+    E[E <= 0] = 1e-12
+    R = np.log2(np.clip(W / E, 1e-3, None))[np.ix_(order, order)]
+    np.fill_diagonal(R, 0.0)                    # self-sharing is not data
+    # Pair-level values are very noisy, and at ~500x500 in a small panel that
+    # speckle hides the blocks.  Average into tiles so each pixel is a mean over
+    # many pairs -- the block signal survives, the pair noise does not.
+    n = len(R); tgt = 120
+    if n > tgt:
+        t = int(np.ceil(n / tgt)); pad = (-n) % t
+        Rp = np.pad(R, ((0, pad), (0, pad)), constant_values=np.nan)
+        R = np.nanmean(Rp.reshape(Rp.shape[0] // t, t, -1, t), axis=(1, 3))
+        scale = 1.0 / t
+    else:
+        scale = 1.0
+    v = max(np.nanpercentile(np.abs(R), 97), 1e-3)
+    im = ax.imshow(R, cmap="RdBu_r", vmin=-v, vmax=v, interpolation="nearest")
+    b = 0
+    for c in sorted(set(lab), key=lambda c: -(lab == c).sum()):
+        b += int((lab == c).sum())
+        if b < len(lab):
+            ax.axhline(b * scale - .5, color="#111111", lw=1.0)
+            ax.axvline(b * scale - .5, color="#111111", lw=1.0)
+    ax.set_title(title, fontsize=9)
+    ax.set_xticks([]); ax.set_yticks([])
+    cb = ax.figure.colorbar(im, ax=ax, fraction=0.046, pad=0.02,
+                            ticks=[-v, 0, v])
+    cb.ax.set_yticklabels(["less\nthan expected", "as\nexpected", "more\nthan expected"],
+                          fontsize=6)
+    cb.ax.tick_params(length=0)
 
 
 def largest_cluster_mask(lab):
@@ -226,15 +451,42 @@ def main():
     ap.add_argument("--ibd-glob", default=os.path.join(_THIS_DIR, "hapibd_merged", "*.ibd.gz"))
     ap.add_argument("--vcf-glob", default=os.path.join(_THIS_DIR, "merged_pruned", "vcf", "*.vcf.gz"))
     ap.add_argument("--out", default=os.path.join(_THIS_DIR, "cluster4pop"))
-    ap.add_argument("--n-pc", type=int, default=10)
-    ap.add_argument("--kmax", type=int, default=5)
+    ap.add_argument("--n-pc", type=int, default=4,
+                    help="PCs kept, at their natural (unwhitened) scale. Scores "
+                         "self-weight by singular value, so this is not critical; "
+                         "the per-population variance spectrum is printed so you "
+                         "can see where the noise bulk starts.")
+    ap.add_argument("--kmax", type=int, default=8,
+                    help="Max K for the SNP K-means sweep (best silhouette wins).")
     ap.add_argument("--sil-thresh", type=float, default=0.10,
-                    help="Min mean silhouette to accept >1 cluster (else keep all).")
-    ap.add_argument("--min-frac", type=float, default=0.10,
-                    help="Min cluster size as a fraction of inliers (rejects "
-                         "trivial outlier-only splits).")
-    ap.add_argument("--n-mad", type=float, default=6.0,
-                    help="Robust-z (MAD) threshold for dropping PC outliers.")
+                    help="Min mean silhouette to accept K>1 for the SNP K-means; "
+                         "below it the population is called homogeneous.")
+    ap.add_argument("--min-samples", type=int, default=10,
+                    help="DBSCAN min_samples: neighbourhood size a point needs to "
+                         "be a core point. Doubles as the smallest cluster size.")
+    ap.add_argument("--eps", type=float, default=None,
+                    help="DBSCAN eps in PC-score units. Default: per-population "
+                         "k-distance knee.")
+    ap.add_argument("--ibd-min-cm", type=float, default=1.0,
+                    help="Only IBD segments >= this length build the co-ancestry "
+                         "graph (~TMRCA 100/2L generations; 1 cM ~ 50 gen). Short "
+                         "segments carry the subpopulation signal -- raising this "
+                         "to 2 cM drops mean AMI vs the panel from 0.63 to 0.47.")
+    ap.add_argument("--ibd-max-cm", type=float, default=np.inf,
+                    help="Upper end of the segment-length bin (default open).")
+    ap.add_argument("--panel", default=os.path.join(
+                        _THIS_DIR, "integrated_call_samples_v3.20130502.ALL.panel"),
+                    help="1000G panel file; if present, every partition is scored "
+                         "against the reported subpopulation labels (ARI/AMI).")
+    ap.add_argument("--ibd-cluster", choices=["louvain", "spectral", "dbscan"],
+                    default="spectral",
+                    help="Which IBD partition writes the label file. All three are "
+                         "always computed and compared.")
+    ap.add_argument("--resolution", type=float, default=1.0,
+                    help="Louvain resolution; >1 gives more, smaller communities.")
+    ap.add_argument("--knn", type=int, default=20,
+                    help="Neighbours kept per node when sparsifying the IBD graph "
+                         "for spectral clustering.")
     ap.add_argument("--max-snps", type=int, default=20000)
     ap.add_argument("--snp-stride", type=int, default=10,
                     help="Take every Nth pruned SNP (spread across the genome).")
@@ -244,46 +496,130 @@ def main():
 
     samples, s2p = load_labels(args.labels)
     pops = args.pop_order
+    truth = {}
+    if args.panel and os.path.exists(args.panel):
+        with open(args.panel) as f:
+            next(f, None)
+            for line in f:
+                c = line.split()
+                if len(c) >= 3:
+                    truth[c[0]] = c[1]
+        print(f"[panel] {len(truth)} reported subpopulation labels from {args.panel}")
     pop_members = {p: [s for s in samples if s2p.get(s) == p] for p in pops}
     for p in pops:
         print(f"[load] {p}: {len(pop_members[p])} individuals")
 
     # ---- features ----
-    print("[ibd] building co-ancestry matrices ...")
-    coanc = load_ibd_coancestry(args.ibd_glob, pop_members)
+    hi = "inf" if not np.isfinite(args.ibd_max_cm) else f"{args.ibd_max_cm:g}"
+    print(f"[ibd] building co-ancestry matrices, segments [{args.ibd_min_cm:g}, {hi}) cM ...")
+    coanc = load_ibd_coancestry(args.ibd_glob, pop_members,
+                                args.ibd_min_cm, args.ibd_max_cm)
     print(f"[snp] loading genotypes (<= {args.max_snps} SNPs, stride {args.snp_stride}) ...")
     want = set(samples)
     gsamp, D = load_genotypes(args.vcf_glob, want, args.max_snps, args.snp_stride)
     gidx = {s: i for i, s in enumerate(gsamp)}
     print(f"[snp] genotype matrix {D.shape} (samples x snps)")
 
+    def describe(lab):
+        uv, uc = np.unique(lab, return_counts=True)
+        n_out = int(uc[uv == -1].sum()) if (uv == -1).any() else 0
+        sizes = sorted((int(c) for v, c in zip(uv, uc) if v >= 0), reverse=True)
+        return sizes, n_out
+
     methods = {}
     summary = {}
-    for method, feat_fn in [
-        ("ibd", lambda p: pca(np.log1p(coanc[p]), args.n_pc)),
-        ("snp", lambda p: pca(D[[gidx[s] for s in pop_members[p] if s in gidx]], args.n_pc)),
-    ]:
-        selected = {}          # pop -> list of kept samples
-        scores = {}            # pop -> (feat, labels, keepmask, members)
+    ibd_alt = {}               # pop -> {algo: labels}, for the comparison table
+
+    # ---- IBD: graph clustering on the co-ancestry matrix ----
+    selected, scores = {}, {}
+    for p in pops:
+        members = pop_members[p]
+        W = coanc[p].copy()
+        np.fill_diagonal(W, 0.0)
+        feat, ev = pca(np.log1p(W), args.n_pc)          # for the diagnostic plot only
+        parts = {
+            "louvain": louvain_clusters(W, args.resolution, args.seed),
+            "spectral": spectral_clusters(W, n_neighbors=args.knn, seed=args.seed)[0],
+            "dbscan": cluster_dbscan(feat, args.min_samples, args.eps)[0],
+        }
+        ibd_alt[p] = parts
+        lab = parts[args.ibd_cluster]
+        keep = largest_cluster_mask(lab)
+        sel = [members[i] for i in range(len(members)) if keep[i]]
+        selected[p] = sel
+        scores[p] = (feat, lab, keep, members)
+        sizes, n_out = describe(lab)
+        summary.setdefault(p, {})["ibd"] = {
+            "n_total": len(members), "algo": args.ibd_cluster,
+            "bin_cm": [args.ibd_min_cm, None if not np.isfinite(args.ibd_max_cm)
+                       else args.ibd_max_cm],
+            "K": len(sizes), "cluster_sizes": sizes, "n_noise": n_out,
+            "n_selected": len(sel),
+            "alt": {a: describe(l)[0] for a, l in parts.items()}}
+        print(f"[ibd] {p}: n={len(members)} algo={args.ibd_cluster} "
+              f"K={len(sizes)} sizes={sizes} noise={n_out} -> keep {len(sel)}")
+        for a, l in parts.items():
+            s, o = describe(l)
+            print(f"        {a:9s} K={len(s):<2d} sizes={s[:6]} noise={o}")
+    methods["ibd"] = (selected, scores)
+
+    # ---- SNP: standard popgen recipe, standardize -> PCA -> K-means ----
+    selected, scores = {}, {}
+    for p in pops:
+        members = [s for s in pop_members[p] if s in gidx]
+        feat, ev = pca(D[[gidx[s] for s in members]], args.n_pc)
+        lab, K, sil = kmeans_pcs(feat, args.kmax, args.sil_thresh, args.seed)
+        keep = largest_cluster_mask(lab)
+        sel = [members[i] for i in range(len(members)) if keep[i]]
+        selected[p] = sel
+        scores[p] = (feat, lab, keep, members)
+        sizes, n_out = describe(lab)
+        var_pct = [round(float(v) * 100, 2) for v in ev[:max(6, args.n_pc + 3)]]
+        summary.setdefault(p, {})["snp"] = {
+            "n_total": len(members), "n_pc": args.n_pc, "K": int(K),
+            "algo": "kmeans", "silhouette": round(sil, 3),
+            "cluster_sizes": sizes, "n_selected": len(sel), "var_pct": var_pct}
+        print(f"[snp] {p}: n={len(members)} kmeans K={K} sil={sil:.2f} "
+              f"sizes={sizes} -> keep {len(sel)}")
+        print(f"        var%={var_pct}")
+    methods["snp"] = (selected, scores)
+
+    # ---- how much does the IBD algorithm choice matter? ----
+    print("\n[compare] IBD partitions: adjusted Rand index (full partition) / "
+          "Jaccard of the KEPT set")
+    algos = ["louvain", "spectral", "dbscan"]
+    for p in pops:
+        row = []
+        for i in range(len(algos)):
+            for j in range(i + 1, len(algos)):
+                a, b = ibd_alt[p][algos[i]], ibd_alt[p][algos[j]]
+                ari = adjusted_rand_score(a, b)
+                ka, kb = largest_cluster_mask(a), largest_cluster_mask(b)
+                un = (ka | kb).sum()
+                jac = (ka & kb).sum() / un if un else 0.0
+                row.append(f"{algos[i][:4]}/{algos[j][:4]} {ari:5.2f}/{jac:4.2f}")
+        print(f"  {p}: " + "   ".join(row))
+        summary[p]["ibd"]["compare"] = row
+
+    # ---- score every partition against the reported 1000G subpopulations ----
+    if truth:
+        print("\n[truth] agreement with reported 1000G subpopulations (ARI / AMI)")
+        print(f"  {'pop':4s} {'#sub':>4s} | " +
+              " ".join(f"{a:>13s}" for a in algos + ["snp-kmeans"]))
         for p in pops:
-            members = ([s for s in pop_members[p] if s in gidx]
-                       if method == "snp" else pop_members[p])
-            feat = feat_fn(p)
-            lab, K, sil = choose_clusters(feat, args.kmax, args.sil_thresh, args.seed,
-                                          min_frac=args.min_frac, n_mad=args.n_mad)
-            keep = largest_cluster_mask(lab)
-            sel = [members[i] for i in range(len(members)) if keep[i]]
-            selected[p] = sel
-            scores[p] = (feat, lab, keep, members)
-            uv, uc = np.unique(lab, return_counts=True)
-            n_out = int(uc[uv == -1].sum()) if (uv == -1).any() else 0
-            sizes = [int(c) for v, c in zip(uv, uc) if v >= 0]
-            summary.setdefault(p, {})[method] = {
-                "n_total": len(members), "K": int(K), "silhouette": round(sil, 3),
-                "cluster_sizes": sizes, "n_outliers": n_out, "n_selected": len(sel)}
-            print(f"[{method}] {p}: n={len(members)} K={K} sil={sil:.2f} "
-                  f"sizes={sizes} outliers={n_out} -> keep {len(sel)}")
-        methods[method] = (selected, scores)
+            mem = pop_members[p]
+            y = np.array([truth.get(s.split("_")[0], "?") for s in mem])
+            cells = [f"{adjusted_rand_score(y, ibd_alt[p][a]):.2f}/"
+                     f"{adjusted_mutual_info_score(y, ibd_alt[p][a]):.2f}"
+                     for a in algos]
+            smem = [s for s in mem if s in gidx]
+            ys = np.array([truth.get(s.split("_")[0], "?") for s in smem])
+            sl = methods["snp"][1][p][1]
+            cells.append(f"{adjusted_rand_score(ys, sl):.2f}/"
+                         f"{adjusted_mutual_info_score(ys, sl):.2f}")
+            print(f"  {p:4s} {len(set(y)):>4d} | " +
+                  " ".join(f"{c:>13s}" for c in cells))
+            summary[p]["truth_ari_ami"] = dict(zip(algos + ["snp-kmeans"], cells))
 
     # ---- write sliced label files ----
     for method, (selected, _) in methods.items():
@@ -296,18 +632,44 @@ def main():
         print(f"[save] {out}  ({n} individuals)")
 
     # ---- diagnostic PCA scatter ----
-    fig, axes = plt.subplots(2, len(pops), figsize=(4 * len(pops), 8), squeeze=False)
-    for r, method in enumerate(["ibd", "snp"]):
-        _, scores = methods[method]
+    # IBD rows are reordered co-ancestry heatmaps (the matrix has no coordinate
+    # space to scatter); the SNP row stays a PC scatter, where genotypes really
+    # are a data matrix and the PC axes are meaningful.
+    nr = len(algos) + 1
+    fig, axes = plt.subplots(nr, len(pops), figsize=(3.4 * len(pops), 3.4 * nr),
+                             squeeze=False)
+    for r, algo in enumerate(algos):
         for c, p in enumerate(pops):
-            ax = axes[r][c]
-            feat, lab, keep, _ = scores[p]
-            ax.scatter(feat[~keep, 0], feat[~keep, 1], s=8, c="#bbbbbb", label="dropped")
-            ax.scatter(feat[keep, 0], feat[keep, 1], s=8, c="#c0392b", label="kept")
-            ax.set_title(f"{method.upper()}  {p}  (keep {keep.sum()}/{len(keep)})", fontsize=10)
-            ax.set_xlabel("PC1"); ax.set_ylabel("PC2")
-    axes[0][0].legend(fontsize=8, loc="best")
-    fig.suptitle("Within-population clustering: kept (red) vs dropped (grey)", fontsize=13)
+            W = coanc[p].copy(); np.fill_diagonal(W, 0.0)
+            lab = ibd_alt[p][algo]
+            k = len(set(lab[lab >= 0]))
+            plot_coancestry_blocks(axes[r][c], W, lab,
+                                   f"IBD {p} -- {algo} (K={k}, n={len(lab)})")
+    for c, p in enumerate(pops):
+        ax = axes[nr - 1][c]
+        feat, lab, keep, _ = methods["snp"][1][p]
+        ax.scatter(feat[~keep, 0], feat[~keep, 1], s=8, c="#bbbbbb", label="dropped")
+        ax.scatter(feat[keep, 0], feat[keep, 1], s=8, c="#c0392b", label="kept")
+        # Clip the view to the bulk: a single extreme sample (AFR has one at
+        # PC1 ~ -140) otherwise squashes every real cluster into a sliver.
+        # Percentiles, not MAD: these PC distributions are deliberately
+        # multimodal, which inflates the MAD and would zoom OUT past the data.
+        off = np.zeros(len(feat), bool)
+        for axis, setlim in ((0, ax.set_xlim), (1, ax.set_ylim)):
+            lo, hi = np.percentile(feat[:, axis], [1, 99])
+            pad = 0.08 * (hi - lo) + 1e-9
+            lo, hi = lo - pad, hi + pad
+            off |= (feat[:, axis] < lo) | (feat[:, axis] > hi)
+            setlim(lo, hi)
+        n_off = int(off.sum())
+        ax.set_title(f"SNP {p} -- kmeans K={len(set(lab[lab >= 0]))} "
+                     f"(keep {keep.sum()}/{len(keep)}"
+                     + (f", {n_off} off-view)" if n_off else ")"), fontsize=9)
+        ax.set_xlabel("PC1"); ax.set_ylabel("PC2")
+    axes[nr - 1][0].legend(fontsize=8, loc="best")
+    fig.suptitle(f"IBD: co-ancestry enrichment log2(W / k_i k_j 2m) reordered by "
+                 f"cluster, {args.ibd_min_cm:g}+ cM  (red diagonal blocks = real "
+                 f"communities)   |   SNP: PC scatter", fontsize=12)
     fig.tight_layout(rect=[0, 0, 1, 0.97])
     fig.savefig(f"{args.out}_clusters.png", dpi=150, bbox_inches="tight")
     print(f"[save] {args.out}_clusters.png")
