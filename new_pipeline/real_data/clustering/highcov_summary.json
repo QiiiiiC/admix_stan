@@ -1,0 +1,473 @@
+{
+  "AFR": {
+    "ibd": {
+      "n_total": 661,
+      "algo": "spectral",
+      "bin_cm": [
+        2.0,
+        null
+      ],
+      "K": 4,
+      "cluster_sizes": [
+        364,
+        113,
+        99,
+        85
+      ],
+      "n_noise": 0,
+      "n_selected": 99,
+      "select": "cohesive",
+      "min_cluster_size": 50,
+      "chosen_cluster": 2,
+      "why": "most cohesive of 4 clusters >= 50",
+      "cohesion": {
+        "louvain": {
+          "0": 0.405,
+          "1": 0.417,
+          "2": 0.964,
+          "3": 0.563,
+          "4": 0.619,
+          "5": 0.7,
+          "6": 0.5,
+          "7": 1.0,
+          "8": 1.0,
+          "9": 1.0,
+          "10": 1.0,
+          "11": 1.0,
+          "12": 1.0
+        },
+        "spectral": {
+          "0": 0.376,
+          "1": 0.411,
+          "2": 0.964,
+          "3": 0.571
+        },
+        "dbscan": {
+          "0": 0.429,
+          "1": 0.451,
+          "2": 0.581,
+          "3": 0.964
+        }
+      },
+      "alt": {
+        "louvain": [
+          334,
+          112,
+          99,
+          86,
+          7,
+          5,
+          5,
+          3,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "spectral": [
+          364,
+          113,
+          99,
+          85
+        ],
+        "dbscan": [
+          313,
+          104,
+          99,
+          84
+        ]
+      },
+      "alt_selected": {
+        "louvain": 99,
+        "spectral": 99,
+        "dbscan": 99
+      },
+      "compare": [
+        "louv/spec  0.89/0.91",
+        "louv/dbsc  0.85/0.89",
+        "spec/dbsc  0.82/0.86"
+      ]
+    },
+    "snp": {
+      "n_total": 661,
+      "n_pc": 4,
+      "K": 4,
+      "algo": "kmeans",
+      "silhouette": 0.661,
+      "cluster_sizes": [
+        222,
+        198,
+        99,
+        88
+      ],
+      "n_selected": 99,
+      "var_pct": [
+        0.86,
+        0.5,
+        0.4,
+        0.31,
+        0.27,
+        0.27,
+        0.26
+      ],
+      "select": "cohesive",
+      "min_cluster_size": 50,
+      "chosen_cluster": 2,
+      "why": "most cohesive of 4 clusters >= 50",
+      "cohesion": {
+        "0": 0.698,
+        "1": 0.634,
+        "2": 0.791,
+        "3": 0.482
+      }
+    },
+    "truth_ari_ami": {
+      "louvain": "0.49/0.74",
+      "spectral": "0.45/0.75",
+      "dbscan": "0.52/0.76",
+      "snp-kmeans": "0.59/0.76"
+    }
+  },
+  "EAS": {
+    "ibd": {
+      "n_total": 504,
+      "algo": "spectral",
+      "bin_cm": [
+        2.0,
+        null
+      ],
+      "K": 5,
+      "cluster_sizes": [
+        149,
+        120,
+        99,
+        94,
+        42
+      ],
+      "n_noise": 0,
+      "n_selected": 94,
+      "select": "cohesive",
+      "min_cluster_size": 50,
+      "chosen_cluster": 3,
+      "why": "most cohesive of 4 clusters >= 50",
+      "cohesion": {
+        "louvain": {
+          "0": 0.248,
+          "1": 0.531,
+          "2": 0.25,
+          "3": 0.674,
+          "4": 0.413
+        },
+        "spectral": {
+          "0": 0.166,
+          "1": 0.364,
+          "2": 0.53,
+          "3": 0.666,
+          "4": 0.596
+        },
+        "dbscan": {
+          "0": 0.16,
+          "1": 0.695
+        }
+      },
+      "alt": {
+        "louvain": [
+          158,
+          99,
+          97,
+          94,
+          56
+        ],
+        "spectral": [
+          149,
+          120,
+          99,
+          94,
+          42
+        ],
+        "dbscan": [
+          395,
+          91
+        ]
+      },
+      "alt_selected": {
+        "louvain": 94,
+        "spectral": 94,
+        "dbscan": 91
+      },
+      "compare": [
+        "louv/spec  0.72/0.15",
+        "louv/dbsc  0.22/0.40",
+        "spec/dbsc  0.22/0.34"
+      ]
+    },
+    "snp": {
+      "n_total": 504,
+      "n_pc": 4,
+      "K": 4,
+      "algo": "kmeans",
+      "silhouette": 0.459,
+      "cluster_sizes": [
+        201,
+        114,
+        104,
+        85
+      ],
+      "n_selected": 104,
+      "var_pct": [
+        0.98,
+        0.45,
+        0.35,
+        0.28,
+        0.28,
+        0.27,
+        0.27
+      ],
+      "select": "cohesive",
+      "min_cluster_size": 50,
+      "chosen_cluster": 2,
+      "why": "most cohesive of 4 clusters >= 50",
+      "cohesion": {
+        "0": 0.44,
+        "1": 0.431,
+        "2": 0.574,
+        "3": 0.405
+      }
+    },
+    "truth_ari_ami": {
+      "louvain": "0.65/0.73",
+      "spectral": "0.70/0.77",
+      "dbscan": "0.19/0.43",
+      "snp-kmeans": "0.59/0.70"
+    }
+  },
+  "EUR": {
+    "ibd": {
+      "n_total": 503,
+      "algo": "spectral",
+      "bin_cm": [
+        2.0,
+        null
+      ],
+      "K": 4,
+      "cluster_sizes": [
+        274,
+        102,
+        101,
+        26
+      ],
+      "n_noise": 0,
+      "n_selected": 101,
+      "select": "cohesive",
+      "min_cluster_size": 50,
+      "chosen_cluster": 2,
+      "why": "most cohesive of 3 clusters >= 50",
+      "cohesion": {
+        "louvain": {
+          "0": 0.317,
+          "1": 0.999,
+          "2": 0.989
+        },
+        "spectral": {
+          "0": 0.408,
+          "1": 0.392,
+          "2": 0.987,
+          "3": 0.932
+        },
+        "dbscan": {
+          "0": 0.989,
+          "1": 0.417,
+          "2": 0.999,
+          "3": 0.41
+        }
+      },
+      "alt": {
+        "louvain": [
+          380,
+          99,
+          24
+        ],
+        "spectral": [
+          274,
+          102,
+          101,
+          26
+        ],
+        "dbscan": [
+          258,
+          99,
+          96,
+          24
+        ]
+      },
+      "alt_selected": {
+        "louvain": 99,
+        "spectral": 101,
+        "dbscan": 99
+      },
+      "compare": [
+        "louv/spec  0.55/0.72",
+        "louv/dbsc  0.50/0.68",
+        "spec/dbsc  0.91/0.94"
+      ]
+    },
+    "snp": {
+      "n_total": 503,
+      "n_pc": 4,
+      "K": 4,
+      "algo": "kmeans",
+      "silhouette": 0.454,
+      "cluster_sizes": [
+        191,
+        109,
+        104,
+        99
+      ],
+      "n_selected": 109,
+      "var_pct": [
+        0.74,
+        0.37,
+        0.3,
+        0.29,
+        0.27,
+        0.27,
+        0.27
+      ],
+      "select": "cohesive",
+      "min_cluster_size": 50,
+      "chosen_cluster": 1,
+      "why": "most cohesive of 4 clusters >= 50",
+      "cohesion": {
+        "0": 0.43,
+        "1": 0.536,
+        "2": 0.338,
+        "3": 0.53
+      }
+    },
+    "truth_ari_ami": {
+      "louvain": "0.23/0.50",
+      "spectral": "0.49/0.70",
+      "dbscan": "0.49/0.68",
+      "snp-kmeans": "0.78/0.88"
+    }
+  },
+  "SAS": {
+    "ibd": {
+      "n_total": 489,
+      "algo": "spectral",
+      "bin_cm": [
+        2.0,
+        null
+      ],
+      "K": 4,
+      "cluster_sizes": [
+        223,
+        102,
+        87,
+        77
+      ],
+      "n_noise": 0,
+      "n_selected": 87,
+      "select": "cohesive",
+      "min_cluster_size": 50,
+      "chosen_cluster": 2,
+      "why": "most cohesive of 4 clusters >= 50",
+      "cohesion": {
+        "louvain": {
+          "0": 0.119,
+          "1": 0.577,
+          "2": 0.833,
+          "3": 0.879,
+          "4": 0.964,
+          "5": 1.0,
+          "6": 1.0,
+          "7": 1.0,
+          "8": 1.0,
+          "9": 1.0,
+          "10": 1.0
+        },
+        "spectral": {
+          "0": 0.127,
+          "1": 0.489,
+          "2": 0.709,
+          "3": 0.417
+        },
+        "dbscan": {
+          "0": 0.147
+        }
+      },
+      "alt": {
+        "louvain": [
+          258,
+          88,
+          78,
+          39,
+          8,
+          5,
+          4,
+          3,
+          2,
+          2,
+          2
+        ],
+        "spectral": [
+          223,
+          102,
+          87,
+          77
+        ],
+        "dbscan": [
+          477
+        ]
+      },
+      "alt_selected": {
+        "louvain": 78,
+        "spectral": 87,
+        "dbscan": 477
+      },
+      "compare": [
+        "louv/spec  0.67/0.79",
+        "louv/dbsc  0.03/0.53",
+        "spec/dbsc  0.01/0.46"
+      ]
+    },
+    "snp": {
+      "n_total": 489,
+      "n_pc": 4,
+      "K": 3,
+      "algo": "kmeans",
+      "silhouette": 0.513,
+      "cluster_sizes": [
+        281,
+        120,
+        67
+      ],
+      "n_selected": 67,
+      "var_pct": [
+        0.48,
+        0.43,
+        0.37,
+        0.37,
+        0.35,
+        0.35,
+        0.33
+      ],
+      "select": "cohesive",
+      "min_cluster_size": 50,
+      "chosen_cluster": 2,
+      "why": "most cohesive of 3 clusters >= 50",
+      "cohesion": {
+        "0": 0.573,
+        "1": 0.223,
+        "2": 0.781
+      }
+    },
+    "truth_ari_ami": {
+      "louvain": "0.36/0.55",
+      "spectral": "0.46/0.60",
+      "dbscan": "0.00/0.03",
+      "snp-kmeans": "0.30/0.44"
+    }
+  }
+}

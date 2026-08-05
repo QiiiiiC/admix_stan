@@ -54,6 +54,12 @@ data {
     array[n_events - n_admixture] int<lower=1, upper=n_events> fixed_indices;
     array[n_events - n_admixture] int<lower=1, upper=n_events+1> fixed_indices_shifted;
 
+    // Nsmooth: tree structure for the log-Ne random walk (parents have a
+    // higher node index than their children).
+    array[n_nodes] int<lower=0> ne_parent;       // parent node (1-based); 0 = root/admix
+    array[n_nodes] int<lower=0> ne_admix_idx;    // admixture index if admix-src node; 0 else
+    array[n_nodes] int<lower=0> ne_start_event;  // creating event (1-based); 0 = leaf (t=0)
+
     // ---- Leaf pairs (shared) ----
     int<lower=0> n_leaf_pairs;
     array[n_leaf_pairs] int<lower=1, upper=n_leaves> pair_i;
@@ -85,28 +91,47 @@ parameters {
     // Ne is built in the transformed parameters block below.
     real mu_log;
     real<lower=0> sigma_log;
-    real<lower=0> tau;            // random-walk step scale (log-Ne smoothness)
-    vector[n_nodes] Ne_raw;
+    real<lower=0> tau;            // log-Ne random-walk step scale (per t_ref gen)
+    vector[n_nodes] Ne_raw;       // std-normal RW increments (non-centered)
 
     real<lower=0> kappa_snp;
 }
 
 transformed parameters {
 
-    // Non-centered per-node effective sizes: Ne ~ lognormal(mu_log, sigma_log).
-    // Gaussian random walk on log-Ne in node order (nodes are inserted leaves-
-    // first then in event-creation order, i.e. ~chronological): partial pooling
-    // across adjacent-in-time nodes.  tau -> 0 gives ~constant Ne (Nfixed); large
-    // tau recovers the old unconstrained per-node model.  Non-centered: Ne_raw are
-    // std-normal increments.
+    vector[n_events] cumulative_times = cumulative_sum(times);
+
+    // === Nsmooth: tree-structured Gaussian random walk on log-Ne ===
+    // Each branch's Ne is centred on the branch it flows INTO going backwards in
+    // time (its parent); admixture branches are centred on the fraction-weighted
+    // mean of their two source branches.  Variance = tau^2 * dt / t_ref, dt =
+    // branch duration.  Parents have higher node index than children, so we fill
+    // log_Ne from the root (highest index) down to the leaves.
+    real t_ref = 100.0;                       // reference branch length (generations)
+    vector[n_nodes] node_t;                   // branch start time (younger end)
+    for (a in 1:n_nodes)
+        node_t[a] = ne_start_event[a] == 0 ? 0.0 : cumulative_times[ne_start_event[a]];
+
     vector[n_nodes] log_Ne;
-    log_Ne[1] = mu_log + sigma_log * Ne_raw[1];
-    for (a_rw in 2:n_nodes) {
-        log_Ne[a_rw] = log_Ne[a_rw - 1] + tau * Ne_raw[a_rw];
+    for (ii in 1:n_nodes) {
+        int a = n_nodes - ii + 1;             // descending index: parents before children
+        if (ne_parent[a] == 0 && ne_admix_idx[a] == 0) {
+            log_Ne[a] = mu_log + sigma_log * Ne_raw[a];            // root anchor
+        } else if (ne_admix_idx[a] > 0) {
+            int i  = ne_admix_idx[a];
+            int p1 = admixture_map[i, 3] + 1;                      // source with fraction f
+            int p2 = admixture_map[i, 4] + 1;                      // source with fraction 1-f
+            real f = admixture_fractions[i];
+            real pmean = f * log_Ne[p1] + (1.0 - f) * log_Ne[p2];
+            real dt = node_t[p1] - node_t[a];
+            log_Ne[a] = pmean + tau * sqrt(dt / t_ref + 1e-9) * Ne_raw[a];
+        } else {
+            int p  = ne_parent[a];
+            real dt = node_t[p] - node_t[a];
+            log_Ne[a] = log_Ne[p] + tau * sqrt(dt / t_ref + 1e-9) * Ne_raw[a];
+        }
     }
     vector<lower=0>[n_nodes] Ne = exp(log_Ne);
-
-    vector[n_events] cumulative_times = cumulative_sum(times);
     matrix[n_nodes, n_nodes] I = diag_matrix(rep_vector(1.0, n_nodes));
 
     // ================================================================
@@ -260,7 +285,7 @@ model {
     // (a log-normal's mean sits above its median).
     mu_log    ~ normal(log(15000), 0.25);  // log-scale location; median Ne = 15000
     sigma_log ~ normal(0, 0.3);            // half-normal (sigma_log >= 0); per-node spread
-    tau       ~ normal(0, 0.3);            // half-normal; log-Ne random-walk step scale
+    tau       ~ normal(0, 0.3);            // half-normal; log-Ne RW step scale
     Ne_raw    ~ std_normal();
 
     kappa_snp ~ exponential(1.0);

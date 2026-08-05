@@ -115,7 +115,8 @@ def make_init(kind, kappa, NE_EV, NE_ADM, N_NODES, N_EPOCH):
 def summarize(sv, kind, dem, NE_ADM):
     p = {"kind": kind,
          "times": np.asarray(sv["times"]).mean(0).tolist(),
-         "admix": np.asarray(sv["admixture_fractions"]).reshape(-1, NE_ADM).mean(0).tolist()}
+         "admix": (np.asarray(sv["admixture_fractions"]).reshape(-1, NE_ADM).mean(0).tolist()
+                   if NE_ADM else [])}
     if kind == "fixed":
         p["effective_N"] = float(np.mean(sv["effective_N"]))
         p["ne_recent"] = p["ne_deep"] = p["effective_N"]
@@ -216,10 +217,13 @@ def spectrum_plot(preds, obs, se, xmid, xlo, names, title, out, density=False, w
     fig.savefig(out, dpi=150, bbox_inches="tight"); plt.close(fig); print(f"[save] {out}")
 
 
-def run(tag, prefix, out_dir, sfx=""):
+def run(tag, prefix, out_dir, sfx="", topology="two_admix", specs=None):
     print("\n"+"#"*70+f"\n### {tag}{sfx}  ->  {out_dir}\n"+"#"*70, flush=True)
     os.makedirs(out_dir, exist_ok=True)
-    dem = T.build_two_admix_4pop(POPS)
+    dem = {"two_admix": T.build_two_admix_4pop,
+           "no_admix":  T.build_tree_no_admix_4pop}[topology](POPS)
+    specs = specs or SPECS
+    order = [s[0] for s in specs]
     ibd_data   = IT.assemble_stan_data(dem, prefix+".npz", prefix+".json", model="ibd",   T_max=IT.DEFAULT_T_MAX)
     mixed_data = IT.assemble_stan_data(dem, prefix+".npz", prefix+".json", model="mixed", T_max=IT.DEFAULT_T_MAX)
     snp_data   = IT.assemble_stan_data(dem, prefix+".npz", prefix+".json", model="snp",   T_max=IT.DEFAULT_T_MAX)
@@ -232,7 +236,7 @@ def run(tag, prefix, out_dir, sfx=""):
 
     fits = json.load(open(CACHE)) if os.path.exists(CACHE) else {}
     changed = False
-    for name, sf, dk, kap, kind in SPECS:
+    for name, sf, dk, kap, kind in specs:
         if fits.get(name, {}).get("advi") is not None:
             continue                                   # already cached
         print(f"[{tag}{sfx}] fit {name}", flush=True)
@@ -246,20 +250,22 @@ def run(tag, prefix, out_dir, sfx=""):
     binL = np.array(ibd_data["bin_length"]); xmid = np.sqrt(binL[:,0]*binL[:,1]); xlo = float(binL[:,0].min())
     width = binL[:,1]-binL[:,0]
 
-    got = {n: fits[n]["advi"] for n in ORDER if fits.get(n, {}).get("advi")}
-    names = [n for n in ORDER if n in got]
+    got = {n: fits[n]["advi"] for n in order if fits.get(n, {}).get("advi")}
+    names = [n for n in order if n in got]
     preds = {n: predict(got[n], ibd_data) for n in names}
     spectrum_plot(preds, obs, se, xmid, xlo, names,
-                  f"Dense {tag}{sfx} IBD spectrum (ADVI, two-admix, HapNe bins)",
+                  f"Dense {tag}{sfx} IBD spectrum (ADVI, {topology}, HapNe bins)",
                   os.path.join(out_dir, f"dense_{tag}_spectrum{sfx}.png"))
     spectrum_plot(preds, obs, se, xmid, xlo, names,
-                  f"Dense {tag}{sfx} IBD density (ADVI, two-admix, HapNe bins)",
+                  f"Dense {tag}{sfx} IBD density (ADVI, {topology}, HapNe bins)",
                   os.path.join(out_dir, f"dense_{tag}_density{sfx}.png"), density=True, width=width)
 
     # ---- ELBO vs iteration (ADVI), small multiples ----
-    nrow = (len(ORDER) + 4) // 5
-    fig, axes = plt.subplots(nrow, 5, figsize=(20, 3.2*nrow)); axes = axes.ravel()
-    for k, n in enumerate(ORDER):
+    ncol = min(5, len(order))
+    nrow = (len(order) + ncol - 1) // ncol
+    fig, axes = plt.subplots(nrow, ncol, figsize=(4*ncol, 3.2*nrow), squeeze=False)
+    axes = axes.ravel()
+    for k, n in enumerate(order):
         ax = axes[k]; ad = fits.get(n, {}).get("advi")
         if ad and ad.get("elbo_iters"):
             ax.plot(ad["elbo_iters"], ad["elbo_vals"], "-", color=COL[n], lw=1.5)
@@ -267,15 +273,15 @@ def run(tag, prefix, out_dir, sfx=""):
             ax.set_yscale("symlog")
         else:
             ax.text(0.5,0.5,f"{n}\n(no ADVI)",ha="center",va="center"); ax.axis("off")
-    for k in range(len(ORDER), len(axes)): axes[k].axis("off")
-    fig.suptitle(f"Dense {tag}{sfx}: ADVI ELBO vs iteration", fontsize=14); fig.tight_layout(rect=[0,0,1,0.97])
+    for k in range(len(order), len(axes)): axes[k].axis("off")
+    fig.suptitle(f"Dense {tag}{sfx}: ADVI ELBO vs iteration ({topology})", fontsize=14); fig.tight_layout(rect=[0,0,1,0.97])
     fig.savefig(os.path.join(out_dir, f"dense_{tag}_elbo{sfx}.png"), dpi=150, bbox_inches="tight"); plt.close(fig)
-    print(f"[save] dense_{tag}_elbo{sfx}.png")
+    print(f"[save] {os.path.join(out_dir, f'dense_{tag}_elbo{sfx}.png')}")
 
     # ---- ADVI summary table ----
-    print(f"\n=== {tag}{sfx}: ADVI (two-admix, HapNe bins) ===")
+    print(f"\n=== {tag}{sfx}: ADVI ({topology}, HapNe bins) ===")
     print(f"{'model':<18}{'Ne_recent':>12}{'Ne_deep':>12}{'admix0':>10}{'admix1':>10}{'tau':>7}{'kappa':>10}")
-    for n in ORDER:
+    for n in order:
         ad = fits.get(n, {}).get("advi")
         def g(d,k,default=float('nan')):
             return d.get(k,default) if d else float('nan')
@@ -290,8 +296,22 @@ if __name__ == "__main__":
     ap.add_argument("--suffix", default="", help="Optional filename suffix.")
     ap.add_argument("--allchr-prefix", default=os.path.join(RD, "real_4pop_allchr"))
     ap.add_argument("--chr1-prefix", default=os.path.join(RD, "real_chr1_4pop"))
+    ap.add_argument("--topology", choices=["two_admix", "no_admix"],
+                    default="two_admix",
+                    help="no_admix = the plain ((EUR,SAS),EAS),AFR) tree.")
+    ap.add_argument("--models", nargs="+", default=None, metavar="NAME",
+                    help=f"Subset of models to fit. Default all. Choices: {ORDER}")
+    ap.add_argument("--tags", nargs="+", default=["allchr", "chr1"],
+                    help="Which datasets to run (allchr and/or chr1).")
     args = ap.parse_args()
     sfx = f"_{args.suffix}" if args.suffix else ""
-    for tag, prefix in [("allchr", args.allchr_prefix), ("chr1", args.chr1_prefix)]:
-        run(tag, prefix, args.out_dir, sfx)
+    specs = SPECS
+    if args.models:
+        unknown = [m for m in args.models if m not in ORDER]
+        if unknown:
+            ap.error(f"unknown model(s) {unknown}; choose from {ORDER}")
+        specs = [s for s in SPECS if s[0] in set(args.models)]
+    prefixes = {"allchr": args.allchr_prefix, "chr1": args.chr1_prefix}
+    for tag in args.tags:
+        run(tag, prefixes[tag], args.out_dir, sfx, args.topology, specs)
     print("\nALL DONE")

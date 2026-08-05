@@ -87,6 +87,35 @@ def build_tree_no_admix(pop_order=DEFAULT_POP_ORDER):
     return d
 
 
+def build_tree_no_admix_4pop(pop_order=("AFR", "EAS", "EUR", "SAS")):
+    """Plain out-of-Africa tree on 4 populations, NO admixture.
+
+      ((EUR, SAS), EAS), AFR)
+
+    Backwards in time:
+      MERGE  EUR + SAS      -> eur_sas      # West Eurasian ancestor
+      MERGE  eur_sas + EAS  -> eurasia      # out-of-Africa ancestor
+      MERGE  eurasia + AFR  -> root
+
+    3 merges, 0 admixtures, 7 nodes.  This is the null topology: it is what the
+    two-admixture graph reduces to if neither admixture edge is needed.  Worth
+    fitting first now that the leaves are single subpopulations rather than
+    pooled superpopulations -- the two admixture edges in build_two_admix_4pop
+    were added to absorb ASW/ACB European ancestry inside the pooled AFR
+    superpopulation and the SAS West/East mixture, and the first of those
+    problems is removed by construction once AFR is a single subpopulation.
+    """
+    leaves = list(pop_order)
+    need = {"AFR", "EAS", "EUR", "SAS"}
+    if set(leaves) != need:
+        raise ValueError(f"pop_order {leaves} must be a permutation of {sorted(need)}.")
+    d = DemographicTopology(leaves)
+    d.add_merge_event("EUR", "SAS", "eur_sas")      # 1
+    d.add_merge_event("eur_sas", "EAS", "eurasia")  # 2
+    d.add_merge_event("eurasia", "AFR", "root")     # 3
+    return d
+
+
 def build_amr_2way_recent(pop_order=DEFAULT_POP_ORDER):
     """Corrected AMR 2-way admixture: recent EUR+AFR sources, deep AFR split.
 

@@ -179,6 +179,19 @@ def open_any(path):
     return open(path, "r")
 
 
+def base_id(s):
+    """Canonical sample key: strip the plink FID_IID doubling.
+
+    'HG00096_HG00096' -> 'HG00096'; 'HG00096' is unchanged.  The two data
+    sources disagree on this: the pruned VCFs were written through plink and
+    carry the doubled form, while the high_cov IBD files carry plain 1000G IDs.
+    Everything that joins the two -- the label table, the haplotype index and
+    the IBD lookup -- goes through this one key so they cannot drift apart.
+    1000G sample IDs contain no underscore of their own.
+    """
+    return s.split("_")[0]
+
+
 def load_population_labels(labels_file, pop_order):
     """
     Read ``population_labels_simple.txt`` (``<sample_id> <POP>`` per line).
@@ -202,7 +215,7 @@ def load_population_labels(labels_file, pop_order):
                     f"Population {pop!r} for sample {sample_id!r} not in "
                     f"pop_order {pop_order}."
                 )
-            sample_to_pop[sample_id] = pop_to_idx[pop]
+            sample_to_pop[base_id(sample_id)] = pop_to_idx[pop]
     print(f"[labels] {len(sample_to_pop)} samples across {len(pop_order)} pops "
           f"({pop_order})")
     return sample_to_pop
@@ -237,7 +250,8 @@ def build_haplotype_index(sample_names, sample_to_pop, pop_order):
     n_pops = len(pop_order)
     counters = [0] * n_pops
     hap_local = {}
-    for s in sample_names:
+    for s_raw in sample_names:
+        s = base_id(s_raw)
         if s not in sample_to_pop:
             # Sample present in VCF but unlabeled -> skip entirely.
             continue
@@ -261,9 +275,17 @@ def load_genmap(genmap_dir, chrom):
 
     Returns (bp_positions, cM_positions) sorted by bp, for np.interp.
     """
-    pattern = os.path.join(genmap_dir, f"plink.chr{chrom}.GRCh37.map")
-    if not os.path.exists(pattern):
-        raise FileNotFoundError(f"Genetic map not found: {pattern}")
+    # The genome build is a property of the map directory, not of this call:
+    # merged_pruned/genmap is GRCh37 while high_cov/genmap is GRCh38, and the
+    # two are never mixed within a run.  Probe the known names rather than
+    # hardcoding one build, so pointing --genmap-dir at either just works.
+    candidates = [os.path.join(genmap_dir, f"plink.chr{chrom}.{b}.map")
+                  for b in ("GRCh37", "GRCh38")]
+    candidates += [os.path.join(genmap_dir, f"plink.chr{chrom}.map")]
+    pattern = next((p for p in candidates if os.path.exists(p)), None)
+    if pattern is None:
+        raise FileNotFoundError(
+            f"Genetic map for chr{chrom} not found; tried: {candidates}")
     bp, cm = [], []
     with open_any(pattern) as f:
         for line in f:
@@ -306,8 +328,8 @@ def compute_allele_freq_matrix(vcf_paths, sample_names, sample_to_pop, pop_order
     # Column index lists per population (into the genotype fields parts[9:]).
     pop_cols = [[] for _ in range(n_pops)]
     for col, s in enumerate(sample_names):
-        if s in sample_to_pop:
-            pop_cols[sample_to_pop[s]].append(col)
+        if base_id(s) in sample_to_pop:
+            pop_cols[sample_to_pop[base_id(s)]].append(col)
     pop_cols = [np.asarray(c, dtype=int) for c in pop_cols]
     # 2 alleles per diploid sample.
     pop_n_alleles = np.array([PLOIDY * len(c) for c in pop_cols], dtype=float)
@@ -510,7 +532,8 @@ def write_oxford_inputs(vcf_path, genmap_dir, chrom, sample_to_pop, out_dir,
     map_path = in_root + ".map"
 
     sample_names_all = read_vcf_samples(vcf_path)
-    keep_cols = [i for i, s in enumerate(sample_names_all) if s in sample_to_pop]
+    keep_cols = [i for i, s in enumerate(sample_names_all)
+                 if base_id(s) in sample_to_pop]
     sample_names = [sample_names_all[i] for i in keep_cols]
     keep_cols = np.asarray(keep_cols, dtype=int)
 
@@ -786,8 +809,8 @@ def accumulate_ibd_segments(ibd_files, hap_local, n_haps, pop_order, bins,
                 h1 = int(parts[col_hap1]) - 1
                 h2 = int(parts[col_hap2]) - 1
 
-                k1 = (s1, h1)
-                k2 = (s2, h2)
+                k1 = (base_id(s1), h1)
+                k2 = (base_id(s2), h2)
                 if k1 not in hap_local or k2 not in hap_local:
                     n_skip_unmapped += 1
                     continue

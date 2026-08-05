@@ -1,0 +1,36 @@
+[bins] uniform 2.0-20.5 cM, width 0.5: 37 bins
+[mask] 7 regions from high_cov/bad_regions_grch38.bed
+[labels] 381 samples across 4 pops (['AFR', 'EAS', 'EUR', 'SAS'])
+[haplotypes] AFR: 198 haplotypes (99 individuals)
+[haplotypes] EAS: 188 haplotypes (94 individuals)
+[haplotypes] EUR: 202 haplotypes (101 individuals)
+[haplotypes] SAS: 174 haplotypes (87 individuals)
+[snp] processed merged_pruned/vcf/merged_all.chr10_pruned.vcf.gz (cumulative 21521 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr11_pruned.vcf.gz (cumulative 40768 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr12_pruned.vcf.gz (cumulative 61127 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr13_pruned.vcf.gz (cumulative 75990 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr14_pruned.vcf.gz (cumulative 90380 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr15_pruned.vcf.gz (cumulative 104958 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr16_pruned.vcf.gz (cumulative 121040 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr17_pruned.vcf.gz (cumulative 135925 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr18_pruned.vcf.gz (cumulative 149655 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr19_pruned.vcf.gz (cumulative 162936 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr1_pruned.vcf.gz (cumulative 196729 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr20_pruned.vcf.gz (cumulative 207811 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr21_pruned.vcf.gz (cumulative 215741 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr22_pruned.vcf.gz (cumulative 224189 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr2_pruned.vcf.gz (cumulative 256156 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr3_pruned.vcf.gz (cumulative 283839 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr4_pruned.vcf.gz (cumulative 310888 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr5_pruned.vcf.gz (cumulative 335210 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr6_pruned.vcf.gz (cumulative 360076 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr7_pruned.vcf.gz (cumulative 374110 sites)
+[snp] processed merged_pruned/vcf/merged_all.chr8_pruned.vcf.gz (cumulative 395347 sites)
+[snp] allele-frequency matrix: 395347 sites x 4 pops
+[snp] 369305/395347 SNPs kept after MAF filter (min_maf=0.05)
+[snp] w_hat range [-4.408e-02, 1.133e-01], w_se range [1.740e-04, 5.920e-04]
+[ibd] parsed high_cov/ibd_all_masked.ibd.gz (cumulative kept 91315)
+[ibd] masked genetic length dropped from normalizer: 21.444 cM
+[ibd] chromosomes used: ['1', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '2', '20', '21', '22', '3', '4', '5', '6', '7', '8', '9'] -> normalizer 3522.33 cM
+[ibd] segments: 286560 read, 91315 kept, 195173 unmapped-haplotype, 72 out-of-bin, 0 other-chromosome, 0 in-masked-region
+[save] wrote clustering/stan_4pop_clustered.npz and clustering/stan_4pop_clustered.json

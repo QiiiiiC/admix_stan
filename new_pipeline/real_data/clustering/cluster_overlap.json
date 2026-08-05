@@ -1,0 +1,278 @@
+[
+  {
+    "route": "SNP kmeans",
+    "pop": "AFR",
+    "n": 99,
+    "subpop": "LWK",
+    "purity": 1.0,
+    "recall": 1.0,
+    "jaccard": 1.0,
+    "composition": {
+      "LWK": [
+        99,
+        99
+      ]
+    }
+  },
+  {
+    "route": "SNP kmeans",
+    "pop": "EAS",
+    "n": 104,
+    "subpop": "JPT",
+    "purity": 1.0,
+    "recall": 1.0,
+    "jaccard": 1.0,
+    "composition": {
+      "JPT": [
+        104,
+        104
+      ]
+    }
+  },
+  {
+    "route": "SNP kmeans",
+    "pop": "EUR",
+    "n": 109,
+    "subpop": "TSI",
+    "purity": 0.9725,
+    "recall": 0.9907,
+    "jaccard": 0.9636,
+    "composition": {
+      "TSI": [
+        106,
+        107
+      ],
+      "IBS": [
+        3,
+        107
+      ]
+    }
+  },
+  {
+    "route": "SNP kmeans",
+    "pop": "SAS",
+    "n": 67,
+    "subpop": "GIH",
+    "purity": 1.0,
+    "recall": 0.6505,
+    "jaccard": 0.6505,
+    "composition": {
+      "GIH": [
+        67,
+        103
+      ]
+    }
+  },
+  {
+    "route": "IBD louvain",
+    "pop": "AFR",
+    "n": 99,
+    "subpop": "LWK",
+    "purity": 1.0,
+    "recall": 1.0,
+    "jaccard": 1.0,
+    "composition": {
+      "LWK": [
+        99,
+        99
+      ]
+    }
+  },
+  {
+    "route": "IBD louvain",
+    "pop": "EAS",
+    "n": 94,
+    "subpop": "CDX",
+    "purity": 0.9787,
+    "recall": 0.9892,
+    "jaccard": 0.9684,
+    "composition": {
+      "CDX": [
+        92,
+        93
+      ],
+      "KHV": [
+        1,
+        99
+      ],
+      "CHB": [
+        1,
+        103
+      ]
+    }
+  },
+  {
+    "route": "IBD louvain",
+    "pop": "EUR",
+    "n": 99,
+    "subpop": "FIN",
+    "purity": 1.0,
+    "recall": 1.0,
+    "jaccard": 1.0,
+    "composition": {
+      "FIN": [
+        99,
+        99
+      ]
+    }
+  },
+  {
+    "route": "IBD louvain",
+    "pop": "SAS",
+    "n": 78,
+    "subpop": "GIH",
+    "purity": 1.0,
+    "recall": 0.7573,
+    "jaccard": 0.7573,
+    "composition": {
+      "GIH": [
+        78,
+        103
+      ]
+    }
+  },
+  {
+    "route": "IBD spectral",
+    "pop": "AFR",
+    "n": 99,
+    "subpop": "LWK",
+    "purity": 1.0,
+    "recall": 1.0,
+    "jaccard": 1.0,
+    "composition": {
+      "LWK": [
+        99,
+        99
+      ]
+    }
+  },
+  {
+    "route": "IBD spectral",
+    "pop": "EAS",
+    "n": 94,
+    "subpop": "CDX",
+    "purity": 0.9787,
+    "recall": 0.9892,
+    "jaccard": 0.9684,
+    "composition": {
+      "CDX": [
+        92,
+        93
+      ],
+      "CHB": [
+        2,
+        103
+      ]
+    }
+  },
+  {
+    "route": "IBD spectral",
+    "pop": "EUR",
+    "n": 101,
+    "subpop": "FIN",
+    "purity": 0.9802,
+    "recall": 1.0,
+    "jaccard": 0.9802,
+    "composition": {
+      "FIN": [
+        99,
+        99
+      ],
+      "CEU": [
+        2,
+        99
+      ]
+    }
+  },
+  {
+    "route": "IBD spectral",
+    "pop": "SAS",
+    "n": 87,
+    "subpop": "GIH",
+    "purity": 1.0,
+    "recall": 0.8447,
+    "jaccard": 0.8447,
+    "composition": {
+      "GIH": [
+        87,
+        103
+      ]
+    }
+  },
+  {
+    "route": "IBD dbscan",
+    "pop": "AFR",
+    "n": 99,
+    "subpop": "LWK",
+    "purity": 1.0,
+    "recall": 1.0,
+    "jaccard": 1.0,
+    "composition": {
+      "LWK": [
+        99,
+        99
+      ]
+    }
+  },
+  {
+    "route": "IBD dbscan",
+    "pop": "EAS",
+    "n": 91,
+    "subpop": "CDX",
+    "purity": 1.0,
+    "recall": 0.9785,
+    "jaccard": 0.9785,
+    "composition": {
+      "CDX": [
+        91,
+        93
+      ]
+    }
+  },
+  {
+    "route": "IBD dbscan",
+    "pop": "EUR",
+    "n": 99,
+    "subpop": "FIN",
+    "purity": 1.0,
+    "recall": 1.0,
+    "jaccard": 1.0,
+    "composition": {
+      "FIN": [
+        99,
+        99
+      ]
+    }
+  },
+  {
+    "route": "IBD dbscan",
+    "pop": "SAS",
+    "n": 477,
+    "subpop": "STU",
+    "purity": 0.2138,
+    "recall": 1.0,
+    "jaccard": 0.2138,
+    "composition": {
+      "STU": [
+        102,
+        102
+      ],
+      "ITU": [
+        100,
+        102
+      ],
+      "PJL": [
+        96,
+        96
+      ],
+      "GIH": [
+        93,
+        103
+      ],
+      "BEB": [
+        86,
+        86
+      ]
+    }
+  }
+]
