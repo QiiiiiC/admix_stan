@@ -107,8 +107,9 @@ def make_init(kind, kappa, NE_EV, NE_ADM, N_NODES, N_EPOCH):
             init["tau"] = 0.3
     elif kind == "epoch":
         init["Ne_epoch"] = [15000.0]*N_EPOCH
-    if kappa:
-        init["kappa_snp"] = 1.0
+    # `kappa` is kept in the signature (callers pass it per-spec) but is now a
+    # no-op: the mixed models take w_se at face value and add the two likelihoods
+    # directly.  See the SNP-likelihood comment in mixed_model_*.stan.
     return init
 
 

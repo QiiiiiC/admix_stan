@@ -79,7 +79,6 @@ parameters {
     vector<lower=1>[n_events] times;
     array[n_admixture] real<lower=0, upper=1> admixture_fractions;
     vector<lower=0>[n_events + 1] Ne_epoch;  // one shared Ne per epoch
-    real<lower=0> kappa_snp;
 }
 
 transformed parameters {
@@ -233,7 +232,6 @@ model {
     admixture_fractions ~ beta(1.0, 1.0);
     // Gamma prior: mean 15000, sd 7500 (shape 4 => coefficient of variation 0.5)
     Ne_epoch ~ gamma(4.0, 4.0 / 15000.0);
-    kappa_snp ~ exponential(1);
 
     // ---- IBD likelihood (composite, no overdispersion) ----
     for (i in 1:n_leaves) {
@@ -251,7 +249,7 @@ model {
     // ---- SNP likelihood (composite, with learned overdispersion) ----
     for (i in 1:n_leaves) {
         for (j in i:n_leaves) {
-            w_hat[i, j] ~ normal(W_centered[i, j], w_se[i, j] * kappa_snp);
+            w_hat[i, j] ~ normal(W_centered[i, j], w_se[i, j]);
         }
     }
 }

@@ -87,6 +87,66 @@ def build_tree_no_admix(pop_order=DEFAULT_POP_ORDER):
     return d
 
 
+def build_tree_2pop(pop_order=("AFR", "EUR")):
+    """Two leaves, one merge.  The minimal graph: a single split.
+
+      MERGE  AFR + EUR -> root          1 event, 3 nodes, 0 admixtures
+
+    Diagnostic topology.  There is essentially nothing here to misspecify -- no
+    admixture, no branching order, no internal branches -- so if the SNP and IBD
+    likelihoods still disagree on this graph, the disagreement is mechanical
+    (estimator scale, normalisation, priors) rather than a wrong demography.
+
+    Worth knowing before reading any SNP result on two leaves: the centered
+    covariance is rank 1.  Both lineages sit in their own leaf until the root,
+    so the cross term snp_mean[AFR,EUR] is exactly 0 and double-centering gives
+
+        W_centered = g * [[1, -1], [-1, 1]],   g = (t/4)(1/Ne_AFR + 1/Ne_EUR)
+
+    i.e. the SNP data is ONE number and cannot separate t from Ne, nor Ne_AFR
+    from Ne_EUR.  IBD identifies all three from the length spectrum, so the
+    clean test is whether the IBD-implied g matches the observed one.
+    """
+    leaves = list(pop_order)
+    if len(leaves) != 2:
+        raise ValueError(f"pop_order {leaves} must have exactly 2 populations.")
+    d = DemographicTopology(leaves)
+    d.add_merge_event(leaves[0], leaves[1], "root")
+    return d
+
+
+def build_tree_3pop(pop_order):
+    """((A, B), C) -- two sister leaves plus an outgroup.  2 merges, 5 nodes.
+
+    Three leaves is the SMALLEST graph on which SNP drift is identifiable per
+    branch, and that is the whole reason to prefer it over build_tree_2pop.  A
+    double-centered symmetric L x L covariance carries L(L-1)/2 free numbers; an
+    unrooted tree on L leaves has 2L-3 branches:
+
+        L = 2 :  1 statistic,  1 branch  -> only x_A + x_B, never the split
+        L = 3 :  3 statistics, 3 branches -> x_A, x_B, x_C each identified
+        L = 4 :  6 statistics, 5 branches -> over-determined, topology testable
+
+    With A and B sister leaves their branch DURATIONS are equal, so the SNP-side
+    ratio x_A / x_B estimates Ne_B / Ne_A with no reference to t at all -- a
+    t-free quantity that can be compared directly against the IBD-side Ne ratio.
+    On two leaves that comparison is impossible in principle, not just noisy.
+
+    Pick A and B with `clustering/f3_screen.py` first: a leaf needs non-negative
+    branch drift, and f3(A; B, C) < 0 says A is admixed and cannot be one.  That
+    screen rejected LWK (Z = -11.3), which the blind IBD clustering had selected
+    as the AFR leaf -- cohesion is a within-population criterion and is blind to
+    admixture, and so is any two-leaf fit.
+    """
+    leaves = list(pop_order)
+    if len(leaves) != 3:
+        raise ValueError(f"pop_order {leaves} must have exactly 3 populations.")
+    d = DemographicTopology(leaves)
+    d.add_merge_event(leaves[0], leaves[1], "sister")   # the two close leaves
+    d.add_merge_event("sister", leaves[2], "root")      # outgroup joins
+    return d
+
+
 def build_tree_no_admix_4pop(pop_order=("AFR", "EAS", "EUR", "SAS")):
     """Plain out-of-Africa tree on 4 populations, NO admixture.
 

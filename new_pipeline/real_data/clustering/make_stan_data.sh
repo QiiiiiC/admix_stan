@@ -36,5 +36,5 @@ $PY generate_stan_data.py \
     --mask-regions high_cov/bad_regions_grch38.bed \
     --bins-uniform 2.0 20.5 0.5 \
     --min-maf 0.05 \
-    --out clustering/stan_4pop_clustered \
+    --out clustering/results_noadmix/stan_data/stan_4pop_clustered \
     2>&1 | tee clustering/make_stan_data.log

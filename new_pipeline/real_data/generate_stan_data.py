@@ -367,9 +367,12 @@ def compute_allele_freq_matrix(vcf_paths, sample_names, sample_to_pop, pop_order
     return F
 
 
+AUTOSOME_MB = 2875.0        # GRCh38 autosomal, non-N
+
+
 def compute_snp_covariance(vcf_paths, sample_names, sample_to_pop, pop_order,
-                           n_haps, se_block_size=500, min_maf=0.0,
-                           max_sites=None):
+                           n_haps, se_block_size=None, se_block_mb=16.0,
+                           min_maf=0.0, max_sites=None):
     """Build (w_hat, w_se) with the SAME estimator the simulation runs use.
 
     This mirrors ``inference_methods.resample_snp_covariance`` exactly -- the
@@ -400,6 +403,15 @@ def compute_snp_covariance(vcf_paths, sample_names, sample_to_pop, pop_order,
     het = mu[valid] * (1.0 - mu[valid])       # (n_snps,) heterozygosities
     print(f"[snp] {int(valid.sum())}/{F.shape[0]} SNPs kept after MAF filter "
           f"(min_maf={min_maf})")
+
+    # TreeMix's rule is about the block's PHYSICAL length, not its SNP count, so
+    # derive the count from this panel's own density rather than hardcoding one.
+    n_kept = int(valid.sum())
+    if se_block_size is None:
+        density = n_kept / AUTOSOME_MB
+        se_block_size = max(1, int(round(se_block_mb * density)))
+        print(f"[snp] density {density:.0f} SNPs/Mb -> {se_block_size} SNPs per "
+              f"{se_block_mb:g} Mb SE block ({n_kept // se_block_size} blocks)")
 
     snp_blocks = [(dev, het)]                  # one genome-wide block
     w_hat, w_se = resample_snp_covariance(
@@ -1131,9 +1143,19 @@ def main():
     ap.add_argument("--out", default=os.path.join(_THIS_DIR, "real_stan_data"),
                     help="Output prefix (writes <prefix>.npz and <prefix>.json)")
     ap.add_argument("--pop-order", nargs="+", default=DEFAULT_POP_ORDER)
-    ap.add_argument("--block-size-snps", type=int, default=500,
-                    help="SNPs per sub-block for the TreeMix covariance "
-                         "jackknife SE (resample_snp_covariance se_block_size).")
+    ap.add_argument("--block-size-mb", type=float, default=16.0,
+                    help="Target PHYSICAL length of a covariance-SE block, in Mb; "
+                         "the SNP count is derived from the panel's own density. "
+                         "TreeMix's criterion is a physical one -- blocks 'larger "
+                         "than blocks of linkage disequilibrium' -- and the paper's "
+                         "k=500 was 10 Mb (HGDP, 124k SNPs) and 20 Mb (dog, 61k "
+                         "SNPs).  Carrying the NUMBER 500 across to a denser panel "
+                         "silently shrinks the block: at our 125 SNPs/Mb it is only "
+                         "4 Mb, which understates every SE by ~1.22x.  Default 16 Mb "
+                         "sits inside TreeMix's own 10-20 Mb range and is where our "
+                         "measured SE plateaus.")
+    ap.add_argument("--block-size-snps", type=int, default=None,
+                    help="Override --block-size-mb with a fixed SNP count.")
     ap.add_argument("--min-maf", type=float, default=0.0)
     ap.add_argument("--max-sites", type=int, default=None,
                     help="Cap on number of SNP sites (debugging).")
@@ -1232,7 +1254,8 @@ def main():
     if not args.skip_snp:
         w_hat, w_se = compute_snp_covariance(
             vcf_paths, sample_names, sample_to_pop, pop_order, n_haps,
-            se_block_size=args.block_size_snps, min_maf=args.min_maf,
+            se_block_size=args.block_size_snps, se_block_mb=args.block_size_mb,
+            min_maf=args.min_maf,
             max_sites=args.max_sites,
         )
 

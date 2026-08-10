@@ -228,7 +228,14 @@ model {
     // variation, so there is no funnel between Ne and sigma_log.  Each Ne has
     // median pinned at 15000; the marginal prior is mean ~16200, SD ~7400
     // (a log-normal's mean sits above its median).
-    mu_log    ~ normal(log(15000), 0.25);  // log-scale location; median Ne = 15000
+    mu_log    ~ normal(log(15000), 0.53);  // log-scale location; median Ne = 15000
+    // 0.53 = sqrt(trigamma(4)), the log-scale sd of the gamma(4, 4/15000) prior
+    // that Nfixed puts on effective_N -- so Nsmooth and Nfixed now express the
+    // SAME prior belief about the LEVEL of Ne and differ only in whether it may
+    // vary across the graph.  At the old 0.25 the two were not comparable: +-28%
+    // at 1 sigma made Ne = 3,300 a ~6-sigma excursion, so SNP-only-Nsmooth on the
+    // AFR-EUR two-leaf test reported the prior (Ne = 10,100, g ratio 0.35) while
+    // SNP-only-Nfixed reached the data (Ne = 3,323, g ratio 1.00).
     sigma_log ~ normal(0, 0.3);            // half-normal (sigma_log >= 0); per-node spread
     tau       ~ normal(0, 0.3);            // half-normal; log-Ne RW step scale
     Ne_raw    ~ std_normal();
@@ -244,6 +251,35 @@ model {
                     } else {
                         target += -ibd_number[b][i,j] * cm * n_samples[i] * n_samples[j];
                     }
+                }
+            }
+        }
+    }
+}
+
+generated quantities {
+    real lp_ibd;
+    real chi2_ibd;
+    int n_ibd_obs;
+
+    // IBD log-likelihood, split out so the composite can be decomposed.  Uses the
+    // full normal_lpdf (the model block's `~` drops the -0.5*log(2*pi) constants,
+    // which cancel within a component but NOT between two components of different
+    // size -- and comparing the two components is the whole point here).
+    lp_ibd = 0;
+    chi2_ibd = 0;
+    n_ibd_obs = 0;
+    for (i in 1:n_leaves) {
+        for (j in i:n_leaves) {
+            for (b in 1:n_bins) {
+                if (ibd_hat[b][i, j] > 0) {
+                    lp_ibd += normal_lpdf(ibd_hat[b][i,j] | ibd_fraction[b][i,j], ibd_se[b][i,j]);
+                    chi2_ibd += square((ibd_hat[b][i,j] - ibd_fraction[b][i,j]) / ibd_se[b][i,j]);
+                    n_ibd_obs += 1;
+                } else if (i == j) {
+                    lp_ibd += -ibd_number[b][i,j] * cm * n_samples[i] * (n_samples[i] - 1) / 2.0;
+                } else {
+                    lp_ibd += -ibd_number[b][i,j] * cm * n_samples[i] * n_samples[j];
                 }
             }
         }
