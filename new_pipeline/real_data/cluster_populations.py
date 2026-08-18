@@ -54,7 +54,7 @@ SNP route currently beats all IBD routes.
 Then regenerate + fit, e.g.:
   PY=/opt/miniconda3/envs/genetics_env/bin/python
   $PY generate_stan_data.py --labels <out>_snp.txt --pop-order AFR EAS EUR SAS \
-      --ibd-method file --ibd-glob 'hapibd_merged/*.ibd.gz' \
+      --ibd-method file --ibd-glob 'high_cov/ibd_all_masked.ibd.gz' \
       --vcf-glob '<pruned vcfs>' --genmap-dir merged_pruned/genmap \
       --bins-uniform 2 20.5 0.5 --min-maf 0.05 --out real_4pop_allchr_snpclust
   $PY fit_dense.py            # after pointing DATASETS at the sliced prefix
@@ -635,7 +635,8 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--labels", default=os.path.join(_THIS_DIR, "population_labels_4pop.txt"))
     ap.add_argument("--pop-order", nargs="+", default=["AFR", "EAS", "EUR", "SAS"])
-    ap.add_argument("--ibd-glob", default=os.path.join(_THIS_DIR, "hapibd_merged", "*.ibd.gz"))
+    ap.add_argument("--ibd-glob",
+                    default=os.path.join(_THIS_DIR, "high_cov", "ibd_all_masked.ibd.gz"))
     ap.add_argument("--vcf-glob", default=os.path.join(_THIS_DIR, "merged_pruned", "vcf", "*.vcf.gz"))
     ap.add_argument("--out", default=os.path.join(_THIS_DIR, "cluster4pop"))
     ap.add_argument("--n-pc", type=int, default=4,

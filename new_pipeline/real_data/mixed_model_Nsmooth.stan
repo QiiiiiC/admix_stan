@@ -75,6 +75,10 @@ data {
     real<lower=0> cm;
     array[n_bins] matrix<lower=0>[n_leaves, n_leaves] ibd_hat;
     array[n_bins] matrix<lower=0>[n_leaves, n_leaves] ibd_se;
+    // Raw segment counts per bin per leaf pair -- what the Poisson likelihood
+    // actually conditions on.  ibd_hat/ibd_se are kept only so the generated
+    // quantities can still report the old normal-based chi2 for comparison.
+    array[n_bins, n_leaves, n_leaves] int<lower=0> ibd_count;
 
     // ---- SNP-specific data ----
     matrix[n_leaves, n_leaves] w_hat;
@@ -198,7 +202,20 @@ transformed parameters {
                 t_end = cumulative_times[1];
             } else if (e == n_events + 1) {
                 t_start = cumulative_times[n_events];
-                t_end = T_max;
+                // T_max is the tail length PAST the root, not an absolute cap.
+                // It used to be `t_end = T_max`, which silently produced an
+                // INVERTED final epoch (t_start > t_end) whenever the root ran
+                // deeper than T_max.  On shallow graphs that never bound; on
+                // (GBR,IBS,YRI) the SNP term needs t_root of order 1e3 and the
+                // (t,Ne) ridge let the optimiser walk to 1e6, past the wall,
+                // where int_p_L integrates backwards -- two topologies died on
+                // non-finite gradients and the rest fitted garbage.  Anchoring
+                // the tail to the root removes the wall entirely and is what
+                // T_max was always meant to express: "integrate the deepest
+                // epoch far enough for the survival to decay".  For a shallow
+                // graph this changes the final epoch by t_root/T_max, i.e. by
+                // 0.2% at t_root = 200 -- numerically a no-op.
+                t_end = cumulative_times[n_events] + T_max;
             } else {
                 t_start = cumulative_times[e - 1];
                 t_end = cumulative_times[e];
@@ -295,19 +312,41 @@ model {
     Ne_raw    ~ std_normal();
 
 
-    // ---- IBD likelihood ----
+    // ---- IBD likelihood: Poisson on the raw segment counts, every bin ----
+    //
+    // Was: normal(ibd_hat | ibd_fraction, ibd_se) when the bin held any segments,
+    // and the Poisson zero term -lambda when it did not.  That split was the
+    // problem.  ibd_se is a delete-one-HAPLOTYPE jackknife, and for a bin holding
+    // k segments on distinct haplotypes it collapses to a closed form,
+    //
+    //     se/mean = sqrt[ (n_i-k)/((n_i-1)k) + (n_j-k)/((n_j-1)k) ]  ->  sqrt(2/k)
+    //
+    // verified against the data to four decimals.  So in the sparse tail the
+    // "standard error" was a deterministic function of the count, carrying no
+    // information the count did not already carry -- and it was sqrt(2) times the
+    // Poisson error, because each segment touches two haplotypes and the jackknife
+    // charges for it once from each side.  At k = 1 that gives se = 1.414*mean, a
+    // Gaussian with most of its mass below zero on a non-negative quantity; at
+    // k = 2, se = mean exactly, so the lower 1-sigma point sits at exactly 0.
+    // Adjacent bins with k = 0 and k = 1 were also getting two entirely different
+    // likelihoods.
+    //
+    // Poisson on the counts removes all of it at once, is what the data actually
+    // are, and is what HapNe-IBD uses.  lambda = (expected segments per pair per
+    // cM) * (genome cM) * (number of pairs).  The k = 0 case is no longer special:
+    // poisson_lpmf(0 | lambda) = -lambda, exactly the old zero branch.
+    //
+    // Full lpmf via target+= rather than `~`, so the -log(k!) terms are kept.  They
+    // are data-only constants that cancel between topologies fitted to the same
+    // data, but keeping them makes lp_ibd a real log-likelihood.
     for (i in 1:n_leaves) {
         for (j in i:n_leaves) {
+            real n_pairs = (i == j)
+                ? n_samples[i] * (n_samples[i] - 1) / 2.0
+                : n_samples[i] * 1.0 * n_samples[j];
             for (b in 1:n_bins) {
-                if (ibd_hat[b][i, j] > 0) {
-                    target += normal_lpdf(ibd_hat[b][i,j] | ibd_fraction[b][i, j], ibd_se[b][i, j]);
-                } else {
-                    if (i == j) {
-                        target += -ibd_number[b][i,j] * cm * n_samples[i] * (n_samples[i] - 1) / 2.0;
-                    } else {
-                        target += -ibd_number[b][i,j] * cm * n_samples[i] * n_samples[j];
-                    }
-                }
+                target += poisson_lpmf(ibd_count[b, i, j] |
+                                       fmax(ibd_number[b][i, j] * cm * n_pairs, 1e-12));
             }
         }
     }
@@ -343,21 +382,24 @@ generated quantities {
     // full normal_lpdf (the model block's `~` drops the -0.5*log(2*pi) constants,
     // which cancel within a component but NOT between two components of different
     // size -- and comparing the two components is the whole point here).
+    // chi2_ibd is now the PEARSON statistic of the Poisson fit, sum (k-lambda)^2/lambda,
+    // over EVERY bin -- empty bins are genuine observations under a Poisson and are
+    // counted, which is why n_ibd_obs is now n_bins * n_leaf_pairs rather than only
+    // the occupied cells.  chi2/n near 1 still means "fits within its own noise",
+    // but the noise is now counting noise rather than a jackknife SE.
     lp_ibd = 0;
     chi2_ibd = 0;
     n_ibd_obs = 0;
     for (i in 1:n_leaves) {
         for (j in i:n_leaves) {
+            real n_pairs = (i == j)
+                ? n_samples[i] * (n_samples[i] - 1) / 2.0
+                : n_samples[i] * 1.0 * n_samples[j];
             for (b in 1:n_bins) {
-                if (ibd_hat[b][i, j] > 0) {
-                    lp_ibd += normal_lpdf(ibd_hat[b][i,j] | ibd_fraction[b][i,j], ibd_se[b][i,j]);
-                    chi2_ibd += square((ibd_hat[b][i,j] - ibd_fraction[b][i,j]) / ibd_se[b][i,j]);
-                    n_ibd_obs += 1;
-                } else if (i == j) {
-                    lp_ibd += -ibd_number[b][i,j] * cm * n_samples[i] * (n_samples[i] - 1) / 2.0;
-                } else {
-                    lp_ibd += -ibd_number[b][i,j] * cm * n_samples[i] * n_samples[j];
-                }
+                real lam = fmax(ibd_number[b][i, j] * cm * n_pairs, 1e-12);
+                lp_ibd += poisson_lpmf(ibd_count[b, i, j] | lam);
+                chi2_ibd += square(ibd_count[b, i, j] - lam) / lam;
+                n_ibd_obs += 1;
             }
         }
     }

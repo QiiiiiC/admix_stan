@@ -1105,10 +1105,12 @@ def assemble_stan_data(dem, npz_path, json_path, model="mixed", T_max=None,
             T_max=T_max, se_floor=se_floor, cm=genome_cm,
         )
     if model == "mixed":
+        ibd_count = ({b: data["ibd_count"][b] for b in range(len(bins))}
+                     if "ibd_count" in data.files else None)
         return build_mixed_stan_data(
             dem, ibd_mean, ibd_var, bins, data["w_hat"], data["w_se"],
             n_samples_per_pop=n_samples, T_max=T_max, se_floor=se_floor,
-            cm=genome_cm,
+            cm=genome_cm, ibd_count=ibd_count,
         )
     raise ValueError(f"Unknown model {model!r}")
 

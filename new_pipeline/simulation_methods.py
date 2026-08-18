@@ -783,6 +783,7 @@ def build_mixed_stan_data(
     T_max: float = None,
     se_floor: float = 1e-8,
     cm: float = None,
+    ibd_count: dict = None,
 ) -> dict:
     """
     Build a Stan data dictionary for mixed_model.stan (IBD + SNP composite
@@ -877,6 +878,14 @@ def build_mixed_stan_data(
 
     data['ibd_hat'] = ibd_hat.tolist()
     data['ibd_se']  = ibd_se.tolist()
+    # Raw segment counts, for the Poisson likelihood.  ibd_hat/ibd_se are still
+    # passed: the generated quantities report both parameterisations so the
+    # Poisson fit can be read against the old normal one.
+    if ibd_count is not None:
+        data['ibd_count'] = np.stack([np.asarray(ibd_count[b], int)
+                                      for b in range(n_bins)]).tolist()
+    else:
+        data['ibd_count'] = np.zeros((n_bins, n_leaves, n_leaves), int).tolist()
     data['cm'] = cm
 
     # -- SNP-specific data --

@@ -185,7 +185,20 @@ transformed parameters {
                 t_end = cumulative_times[1];
             } else if (e == n_events + 1) {
                 t_start = cumulative_times[n_events];
-                t_end = T_max;
+                // T_max is the tail length PAST the root, not an absolute cap.
+                // It used to be `t_end = T_max`, which silently produced an
+                // INVERTED final epoch (t_start > t_end) whenever the root ran
+                // deeper than T_max.  On shallow graphs that never bound; on
+                // (GBR,IBS,YRI) the SNP term needs t_root of order 1e3 and the
+                // (t,Ne) ridge let the optimiser walk to 1e6, past the wall,
+                // where int_p_L integrates backwards -- two topologies died on
+                // non-finite gradients and the rest fitted garbage.  Anchoring
+                // the tail to the root removes the wall entirely and is what
+                // T_max was always meant to express: "integrate the deepest
+                // epoch far enough for the survival to decay".  For a shallow
+                // graph this changes the final epoch by t_root/T_max, i.e. by
+                // 0.2% at t_root = 200 -- numerically a no-op.
+                t_end = cumulative_times[n_events] + T_max;
             } else {
                 t_start = cumulative_times[e - 1];
                 t_end = cumulative_times[e];
