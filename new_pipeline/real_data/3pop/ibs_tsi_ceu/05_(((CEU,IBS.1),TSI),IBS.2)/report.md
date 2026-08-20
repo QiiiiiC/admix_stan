@@ -6,46 +6,46 @@ Model 05 of 21 | admixed leaf: **IBS** | 4 events, 8 nodes
 
 | quantity | value | |
 |---|---|---|
-| ELBO | -845.73 | +- 2.09 (MC) |
-| logZ (importance sampling) | -739.55 | |
-| ESS of the IS weights | 2.2 / 4000 | LOW -- treat logZ with suspicion |
+| ELBO | -474.99 | +- 0.14 (MC) |
+| logZ (importance sampling) | -464.32 | |
+| ESS of the IS weights | 9.6 / 4000 | LOW -- treat logZ with suspicion |
 | Stan dropped-constant correction | -25.77 | already applied |
-| seed kept / runtime | 23 | 24 s |
+| seed kept / runtime | 23 | 23 s |
 
 ## Events (in temporal order, most recent first)
 
 | # | type | detail | time (gen) | cumulative |
 |---|---|---|---|---|
-| 1 | ADMIXTURE | IBS -> IBS.1 + IBS.2 | 1.0 +- 0.0 | 1.0 |
-| 2 | MERGE | IBS.2 + CEU -> n1 | 1.2 +- 0.0 | 2.2 |
-| 3 | MERGE | n1 + TSI -> n2 | 164.4 +- 4.0 | 166.6 |
-| 4 | MERGE | IBS.1 + n2 -> root | 137.3 +- 4.6 | 303.9 |
+| 1 | ADMIXTURE | IBS -> IBS.1 + IBS.2 | 70.6 +- 0.4 | 70.6 |
+| 2 | MERGE | IBS.2 + CEU -> n1 | 77.8 +- 0.7 | 148.4 |
+| 3 | MERGE | n1 + TSI -> n2 | 11.4 +- 0.4 | 159.7 |
+| 4 | MERGE | IBS.1 + n2 -> root | 8.8 +- 0.1 | 168.5 |
 
 ## Admixture fraction
 
-**f = 0.944 +- 0.003** (fraction from `IBS.1`; 0.056 from `IBS.2`)
+**f = 0.595 +- 0.004** (fraction from `IBS.1`; 0.405 from `IBS.2`)
 
 ## Effective sizes (haploid)
 
 | node | Ne | sd of log Ne |
 |---|---|---|
-| `IBS` | 385,889 | 0.23 |
-| `TSI` | 303,341 | 0.13 |
-| `CEU` | 274,059 | 0.13 |
-| `IBS.1` | 409,420 | 0.23 |
-| `IBS.2` | 282,564 | 0.13 |
-| `n1` | 279,824 | 0.13 |
-| `n2` | 288,208 | 0.13 |
-| `root` | 50 | 0.16 |
+| `IBS` | 871,072 | 0.06 |
+| `TSI` | 451,595 | 0.03 |
+| `CEU` | 671,056 | 0.10 |
+| `IBS.1` | 133,879 | 0.03 |
+| `IBS.2` | 17,803 | 0.05 |
+| `n1` | 2,003 | 0.05 |
+| `n2` | 4,366 | 0.05 |
+| `root` | 19,355 | 0.01 |
 
-log-Ne random-walk step scale tau = 1.239
+log-Ne random-walk step scale tau = 1.627
 
 ## Fit quality by component
 
 | component | log-likelihood | n terms | chi2/n |
 |---|---|---|---|
-| IBD | +550.2 | 110 | 15.47 |
-| SNP | -1,191.8 | 6 | 416.00 |
+| IBD | -407.1 | 222 | 1.88 |
+| SNP | +53.2 | 6 | 1.01 |
 
 chi2/n is the mean squared standardized residual: 1.0 = fits inside its own SEs. Do NOT compare the two log-likelihood LEVELS against each other -- different term counts and different units.
 
@@ -53,8 +53,8 @@ chi2/n is the mean squared standardized residual: 1.0 = fits inside its own SEs.
 
 | | IBS | TSI | CEU |
 |---|---|---|---|
-| **IBS** | +10.83 | +1.78 | -10.97 |
-| **TSI** | +1.78 | +26.24 | -27.56 |
-| **CEU** | -10.97 | -27.56 | +27.79 |
+| **IBS** | +0.56 | +0.01 | -0.51 |
+| **TSI** | +0.01 | +0.75 | -0.78 |
+| **CEU** | -0.51 | -0.78 | +0.88 |
 
 ![spectrum](spectrum_fit.png)

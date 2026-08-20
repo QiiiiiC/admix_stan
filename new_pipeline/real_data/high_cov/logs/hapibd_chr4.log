@@ -1,0 +1,29 @@
+Copyright (C) 2019 Brian L. Browning
+Enter "java -jar hap-ibd.jar" to print a list of command line arguments
+
+Program            :  hap-ibd.jar  [ version 1.0, 20May22.818 ]
+Start Time         :  08:16 PM BST on 03 Aug 2026
+Max Memory         :  4096 MB
+
+Parameters
+  gt               :  /Users/qichen/github/admix_stan/new_pipeline/real_data/high_cov/array_vcf/chr4.vcf.gz
+  map              :  /Users/qichen/github/admix_stan/new_pipeline/real_data/high_cov/genmap/plink.chr4.GRCh38.map
+  out              :  /Users/qichen/github/admix_stan/new_pipeline/real_data/high_cov/ibd/chr4
+  min-seed         :  1.5
+  max-gap          :  1000
+  min-extend       :  1.0
+  min-output       :  2.0
+  min-markers      :  100
+  min-mac          :  2
+  nthreads         :  8
+
+Statistics
+  samples          :  2157
+  markers          :  51553
+  IBD segments     :  20796
+  IBD segs/sample  :  9.6
+  HBD segments     :  363
+  HBD segs/sample  :  0.168
+
+Wallclock Time:    :  3 seconds
+End Time           :  08:16 PM BST on 03 Aug 2026

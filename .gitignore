@@ -1,0 +1,46 @@
+# ---------------------------------------------------------------------------
+# Large input data -- regenerable, and far past what GitHub will take.
+# high_cov/vcf alone is 32 GB across 44 phased VCFs averaging ~730 MB each;
+# GitHub's hard limit is 100 MB per file, so these can never be committed.
+# ---------------------------------------------------------------------------
+new_pipeline/real_data/high_cov/vcf/
+new_pipeline/real_data/merged_pruned/
+new_pipeline/real_data/hapibd_work/
+new_pipeline/plink_output/
+new_pipeline/fastsmc_work/
+*.vcf
+*.vcf.gz
+*.bcf
+*.bed
+*.bim
+*.fam
+!new_pipeline/real_data/high_cov/bad_regions_grch38.bed
+!new_pipeline/real_data/high_cov/reference_masks/*.bed
+
+# ---------------------------------------------------------------------------
+# Third-party tools installed into the tree, not our code.
+# ---------------------------------------------------------------------------
+new_pipeline/real_data/tools/HapNe/
+*.jar
+
+# ---------------------------------------------------------------------------
+# Build artifacts.  cmdstanpy compiles each .stan into a same-named Mach-O
+# executable next to it; those were tracked, so every recompile wrote another
+# ~4 MB blob into history (18 of them, 60 MB per full rebuild).  The .stan
+# source is the artifact worth keeping -- the binary is machine-specific and
+# rebuilt automatically on first use.
+# ---------------------------------------------------------------------------
+new_pipeline/models/ibd_model_N*
+new_pipeline/models/mixed_model_N*
+new_pipeline/models/snp_model_N*
+new_pipeline/real_data/ibd_model_N*
+new_pipeline/real_data/mixed_model_N*
+new_pipeline/real_data/snp_model_N*
+!*.stan
+*.hpp
+*.o
+*.d
+
+__pycache__/
+*.pyc
+.DS_Store

@@ -8,24 +8,24 @@ Model 20 of 21 | admixed leaf: **CEU** | 4 events, 8 nodes
 
 | quantity | value | |
 |---|---|---|
-| ELBO | -782.15 | +- 2.01 (MC) |
-| logZ (importance sampling) | -716.22 | |
-| ESS of the IS weights | 1.2 / 4000 | LOW -- treat logZ with suspicion |
+| ELBO | -1980.58 | +- 0.21 (MC) |
+| logZ (importance sampling) | -1968.57 | |
+| ESS of the IS weights | 11.6 / 4000 | LOW -- treat logZ with suspicion |
 | Stan dropped-constant correction | -25.77 | already applied |
-| seed kept / runtime | 31 | 23 s |
+| seed kept / runtime | 7 | 15 s |
 
 ## Events (in temporal order, most recent first)
 
 | # | type | detail | time (gen) | cumulative |
 |---|---|---|---|---|
-| 1 | ADMIXTURE | CEU -> CEU.1 + CEU.2 | 1.0 +- 0.0 | 1.0 |
-| 2 | MERGE | IBS + TSI -> n1 | 1.0 +- 0.0 | 2.0 |
-| 3 | MERGE | CEU.2 + n1 -> n2 | 144.1 +- 1.9 | 146.1 |
-| 4 | MERGE | CEU.1 + n2 -> root | 1.3 +- 0.0 | 147.4 |
+| 1 | ADMIXTURE | CEU -> CEU.1 + CEU.2 | 130.3 +- 0.7 | 130.3 |
+| 2 | MERGE | IBS + TSI -> n1 | 19.4 +- 0.4 | 149.7 |
+| 3 | MERGE | CEU.2 + n1 -> n2 | 1.1 +- 0.0 | 150.8 |
+| 4 | MERGE | CEU.1 + n2 -> root | 2.3 +- 0.1 | 153.1 |
 
 ## Admixture fraction
 
-**f = 0.003 +- 0.000** (fraction from `CEU.1`; 0.997 from `CEU.2`)
+**f = 0.015 +- 0.002** (fraction from `CEU.1`; 0.985 from `CEU.2`)
 
 Collapsed to a tree: one source carries <5% of the ancestry, so this graph is behaving as its no-admixture special case.
 
@@ -33,23 +33,23 @@ Collapsed to a tree: one source carries <5% of the ancestry, so this graph is be
 
 | node | Ne | sd of log Ne |
 |---|---|---|
-| `IBS` | 371,183,660 | 1.17 |
-| `TSI` | 370,331,648 | 1.17 |
-| `CEU` | 390,907 | 0.17 |
-| `CEU.1` | 0 | 0.28 |
-| `CEU.2` | 404,000 | 0.17 |
-| `n1` | 367,885,611 | 1.17 |
-| `n2` | 14,740 | 0.13 |
-| `root` | 15,366 | 0.07 |
+| `IBS` | 320,639 | 0.08 |
+| `TSI` | 401,777 | 0.04 |
+| `CEU` | 667,531 | 0.05 |
+| `CEU.1` | 12,302 | 0.10 |
+| `CEU.2` | 6,015 | 0.04 |
+| `n1` | 35,800 | 0.07 |
+| `n2` | 22,484 | 0.05 |
+| `root` | 12,218 | 0.02 |
 
-log-Ne random-walk step scale tau = 1.874
+log-Ne random-walk step scale tau = 1.583
 
 ## Fit quality by component
 
 | component | log-likelihood | n terms | chi2/n |
 |---|---|---|---|
-| IBD | +650.7 | 110 | 15.19 |
-| SNP | -1,263.9 | 6 | 440.05 |
+| IBD | -1,172.1 | 222 | 8.34 |
+| SNP | -692.2 | 6 | 249.47 |
 
 chi2/n is the mean squared standardized residual: 1.0 = fits inside its own SEs. Do NOT compare the two log-likelihood LEVELS against each other -- different term counts and different units.
 
@@ -57,8 +57,8 @@ chi2/n is the mean squared standardized residual: 1.0 = fits inside its own SEs.
 
 | | IBS | TSI | CEU |
 |---|---|---|---|
-| **IBS** | +18.96 | -35.61 | +7.97 |
-| **TSI** | -35.61 | +26.96 | -12.18 |
-| **CEU** | +7.97 | -12.18 | +5.90 |
+| **IBS** | +9.88 | -24.74 | +8.49 |
+| **TSI** | -24.74 | +22.76 | -12.58 |
+| **CEU** | +8.49 | -12.58 | +5.97 |
 
 ![spectrum](spectrum_fit.png)

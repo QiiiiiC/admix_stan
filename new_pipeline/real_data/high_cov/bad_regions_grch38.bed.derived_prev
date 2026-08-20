@@ -1,0 +1,14 @@
+# IBD bad-region mask, GRCh38, derived by high_cov/derive_mask.py
+# (c) >=4.0x cross-population enrichment over the genome-wide ratio, >=5 cross segments per 1 Mb window
+# (d) OR >=15.0x median within-population density AND >=1.5x enrichment (map-discontinuity class)
+chr1	133000000	135000000
+chr10	45000000	47000000
+chr10	49000000	51000000
+chr14	17000000	18000000
+chr14	105000000	106000000
+chr15	18000000	22000000
+chr2	2000000	6000000
+chr21	16000000	17000000
+chr22	11000000	12000000
+chr22	14000000	15000000
+chr8	12000000	13000000
