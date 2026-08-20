@@ -1,0 +1,27 @@
+# Excess-IBD regions, hg19/GRCh37, Table 3 of Li H, Glusman G, Hu H, Shankaracharya,
+# Caballero J, Hubley R, Witherspoon D, Guthery SL, Mauldin DE, Jorde LB, Hood L,
+# Roach JC, Huff CD (2014) "Relationship Estimation from Whole-Genome Sequence Data",
+# PLoS Genetics 10(1):e1004144.  PMC3907355.
+#
+# Criterion: observed/expected total IBD segment length >= 4-fold AND region >= 5 cM,
+# measured with GERMLINE, ISCA and fastIBD across European, East Asian and Mexican
+# American controls.  14 regions, 119.92 cM total; covers <5% of the genome but 13%
+# of centromeric and 47% of unmappable heterochromatic sequence.
+# Masking these dropped spurious relationship detection among European controls
+# from 10% to 1% (alpha = 0.001, ERSA 2.0 + GERMLINE).
+#
+# COORDINATES ARE hg19 -- must be lifted to GRCh38 before use here.
+chr1	118434520	153401108	9.95
+chr2	85304243	99558013	6.53
+chr2	132695025	141442636	9.16
+chr2	192352906	198110229	5.04
+chr8	10428647	13469693	7.96
+chr9	38293483	72605261	8.15
+chr10	44555093	53240188	7.58
+chr15	20060673	25145260	10.46
+chr15	27115823	30295750	9.29
+chr16	19393068	24031556	6.18
+chr17	59518083	64970531	6.23
+chr17	77186666	78417478	5.66
+chr21	16344186	19375168	6.91
+chr22	16051881	25095451	20.82

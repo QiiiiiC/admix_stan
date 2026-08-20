@@ -6,35 +6,35 @@
 
 | rank | topology | adm | ELBO | dELBO | restart range | ESS | chi2/n IBD | chi2/n SNP | f | P_model | P_argmax |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | [`(((CEU,TSI.1),IBS),TSI.2)`](../11_(((CEU,TSI.1),IBS),TSI.2)/report.md) | 1 | +1288.2 | +0.0 | 2.1 | 4.5 | 2.22 | 2.17 | 1.000 | 0.984 | 1.000 |
-| 2 | [`((CEU.1,IBS),(CEU.2,TSI))`](../21_((CEU.1,IBS),(CEU.2,TSI))/report.md) | 1 | +1284.1 | -4.1 | 2.5 | 1.0 | 2.15 | 1.85 | 0.880 | 0.016 | 0.000 |
-| 3 | [`(((CEU,IBS.1),IBS.2),TSI)`](../04_(((CEU,IBS.1),IBS.2),TSI)/report.md) | 1 | +1272.8 | -15.4 | 1.1 | 1.3 | 2.36 | 3.52 | 0.995 | 0.000 | 0.000 |
-| 4 | [`(((CEU.1,IBS),CEU.2),TSI)`](../16_(((CEU.1,IBS),CEU.2),TSI)/report.md) | 1 | +1269.8 | -18.4 | 1.3 | 3.0 | 2.36 | 1.78 | 0.120 | 0.000 | 0.000 |
-| 5 | [`(((CEU.1,TSI),CEU.2),IBS)`](../18_(((CEU.1,TSI),CEU.2),IBS)/report.md) | 1 | +1068.9 | -219.3 | 1.8 | 3.5 | 6.23 | 1.82 | 0.986 | 0.000 | 0.000 |
-| 6 | [`(((CEU,TSI.1),TSI.2),IBS)`](../12_(((CEU,TSI.1),TSI.2),IBS)/report.md) | 1 | +1025.8 | -262.4 | 2.2 | 9.3 | 7.00 | 4.25 | 0.980 | 0.000 | 0.000 |
-| 7 | [`(((IBS.1,TSI),IBS.2),CEU)`](../08_(((IBS.1,TSI),IBS.2),CEU)/report.md) | 1 | +737.1 | -551.1 | 3.2 | 9.6 | 11.69 | 2.33 | 0.986 | 0.000 | 0.000 |
-| 8 | [`((CEU,IBS.1),(IBS.2,TSI))`](../09_((CEU,IBS.1),(IBS.2,TSI))/report.md) | 1 | +640.3 | -647.8 | 4.2 | 1.1 | 4.10 | 171.62 | 0.583 | 0.000 | 0.000 |
-| 9 | [`((IBS,TSI),CEU)`](../03_((IBS,TSI),CEU)/report.md) | 0 | +278.5 | -1009.6 | 0.7 | 4.5 | 13.75 | 118.48 | - | 0.000 | 0.000 |
-| 10 | [`(((IBS,TSI.1),TSI.2),CEU)`](../14_(((IBS,TSI.1),TSI.2),CEU)/report.md) | 1 | +190.4 | -1097.8 | 4.5 | 3.6 | 14.26 | 103.96 | 1.000 | 0.000 | 0.000 |
-| 11 | [`((CEU,IBS),TSI)`](../01_((CEU,IBS),TSI)/report.md) | 0 | -23.8 | -1312.0 | 1.3 | 2.5 | 13.50 | 228.05 | - | 0.000 | 0.000 |
-| 12 | [`(((IBS.1,TSI),CEU),IBS.2)`](../07_(((IBS.1,TSI),CEU),IBS.2)/report.md) | 1 | -64.9 | -1353.1 | 4.4 | 2.6 | 13.86 | 199.10 | 0.985 | 0.000 | 0.000 |
-| 13 | [`(((CEU.1,TSI),IBS),CEU.2)`](../19_(((CEU.1,TSI),IBS),CEU.2)/report.md) | 1 | -332.1 | -1620.3 | 5.5 | 1.2 | 16.94 | 242.33 | 0.623 | 0.000 | 0.000 |
-| 14 | [`(((IBS,TSI.1),CEU),TSI.2)`](../13_(((IBS,TSI.1),CEU),TSI.2)/report.md) | 1 | -347.0 | -1635.1 | 8.8 | 8.9 | 17.64 | 226.91 | 0.061 | 0.000 | 0.000 |
-| 15 | [`(((CEU.1,IBS),TSI),CEU.2)`](../17_(((CEU.1,IBS),TSI),CEU.2)/report.md) | 1 | -364.4 | -1652.5 | 24.3 | 2.5 | 20.25 | 172.83 | 0.011 | 0.000 | 0.000 |
-| 16 | [`((CEU,TSI.1),(IBS,TSI.2))`](../15_((CEU,TSI.1),(IBS,TSI.2))/report.md) | 1 | -601.6 | -1889.8 | 1.3 | 1.4 | 36.33 | 5.23 | 0.002 | 0.000 | 0.000 |
-| 17 | [`(((CEU,TSI),IBS.1),IBS.2)`](../06_(((CEU,TSI),IBS.1),IBS.2)/report.md) | 1 | -636.0 | -1924.2 | 1.1 | 3.3 | 36.65 | 7.17 | 0.009 | 0.000 | 0.000 |
-| 18 | [`((CEU,TSI),IBS)`](../02_((CEU,TSI),IBS)/report.md) | 0 | -637.5 | -1925.7 | 2.4 | 58.1 | 37.65 | 9.46 | - | 0.000 | 0.000 |
-| 19 | [`(((IBS,TSI),CEU.1),CEU.2)`](../20_(((IBS,TSI),CEU.1),CEU.2)/report.md) | 1 | -782.1 | -2070.3 | 44.1 | 1.2 | 15.19 | 440.05 | 0.003 | 0.000 | 0.000 |
-| 20 | [`(((CEU,IBS.1),TSI),IBS.2)`](../05_(((CEU,IBS.1),TSI),IBS.2)/report.md) | 1 | -845.7 | -2133.9 | 16.2 | 2.2 | 15.47 | 416.00 | 0.944 | 0.000 | 0.000 |
-| 21 | [`(((CEU,IBS),TSI.1),TSI.2)`](../10_(((CEU,IBS),TSI.1),TSI.2)/report.md) | 1 | -1140.9 | -2429.1 | 1.3 | 3.1 | 15.90 | 537.80 | 0.002 | 0.000 | 0.000 |
+| 1 | [`(((CEU,IBS.1),TSI),IBS.2)`](../05_(((CEU,IBS.1),TSI),IBS.2)/report.md) | 1 | -475.0 | +0.0 | 2.9 | 9.6 | 1.88 | 1.01 | 0.595 | 1.000 | 1.000 |
+| 2 | [`(((CEU,TSI.1),IBS),TSI.2)`](../11_(((CEU,TSI.1),IBS),TSI.2)/report.md) | 1 | -566.7 | -91.7 | 0.6 | 4.0 | 2.35 | 10.29 | 0.879 | 0.000 | 0.000 |
+| 3 | [`(((CEU,IBS.1),IBS.2),TSI)`](../04_(((CEU,IBS.1),IBS.2),TSI)/report.md) | 1 | -574.9 | -99.9 | 0.9 | 3.3 | 2.87 | 1.93 | 0.983 | 0.000 | 0.000 |
+| 4 | [`((CEU,IBS.1),(IBS.2,TSI))`](../09_((CEU,IBS.1),(IBS.2,TSI))/report.md) | 1 | -626.4 | -151.4 | 1.8 | 7.2 | 3.08 | 3.42 | 0.617 | 0.000 | 0.000 |
+| 5 | [`(((CEU.1,IBS),CEU.2),TSI)`](../16_(((CEU.1,IBS),CEU.2),TSI)/report.md) | 1 | -653.0 | -178.0 | 1.9 | 2.6 | 3.18 | 6.18 | 1.000 | 0.000 | 0.000 |
+| 6 | [`(((CEU.1,IBS),TSI),CEU.2)`](../17_(((CEU.1,IBS),TSI),CEU.2)/report.md) | 1 | -665.0 | -190.0 | 3.2 | 17.9 | 3.11 | 9.54 | 0.175 | 0.000 | 0.000 |
+| 7 | [`((CEU.1,IBS),(CEU.2,TSI))`](../21_((CEU.1,IBS),(CEU.2,TSI))/report.md) | 1 | -872.4 | -397.4 | 3.0 | 10.0 | 4.86 | 2.63 | 0.997 | 0.000 | 0.000 |
+| 8 | [`((CEU,TSI.1),(IBS,TSI.2))`](../15_((CEU,TSI.1),(IBS,TSI.2))/report.md) | 1 | -1175.0 | -700.0 | 1.4 | 3.1 | 7.38 | 1.09 | 0.989 | 0.000 | 0.000 |
+| 9 | [`(((CEU.1,TSI),CEU.2),IBS)`](../18_(((CEU.1,TSI),CEU.2),IBS)/report.md) | 1 | -1467.6 | -992.6 | 1.8 | 3.0 | 11.32 | 10.99 | 0.996 | 0.000 | 0.000 |
+| 10 | [`(((CEU.1,TSI),IBS),CEU.2)`](../19_(((CEU.1,TSI),IBS),CEU.2)/report.md) | 1 | -1478.8 | -1003.8 | 2.2 | 7.4 | 11.40 | 7.28 | 1.000 | 0.000 | 0.000 |
+| 11 | [`(((IBS,TSI.1),CEU),TSI.2)`](../13_(((IBS,TSI.1),CEU),TSI.2)/report.md) | 1 | -1535.1 | -1060.1 | 1.4 | 7.0 | 7.56 | 128.35 | 0.446 | 0.000 | 0.000 |
+| 12 | [`(((CEU,TSI.1),TSI.2),IBS)`](../12_(((CEU,TSI.1),TSI.2),IBS)/report.md) | 1 | -1897.6 | -1422.6 | 1.8 | 11.1 | 9.63 | 203.33 | 0.999 | 0.000 | 0.000 |
+| 13 | [`((CEU,IBS),TSI)`](../01_((CEU,IBS),TSI)/report.md) | 0 | -1920.1 | -1445.1 | 2.2 | 28.9 | 4.95 | 359.47 | - | 0.000 | 0.000 |
+| 14 | [`(((CEU,IBS),TSI.1),TSI.2)`](../10_(((CEU,IBS),TSI.1),TSI.2)/report.md) | 1 | -1928.9 | -1453.9 | 5.2 | 6.5 | 4.93 | 347.91 | 0.542 | 0.000 | 0.000 |
+| 15 | [`(((IBS,TSI),CEU.1),CEU.2)`](../20_(((IBS,TSI),CEU.1),CEU.2)/report.md) | 1 | -1980.6 | -1505.6 | 2.4 | 11.6 | 8.34 | 249.47 | 0.015 | 0.000 | 0.000 |
+| 16 | [`(((IBS.1,TSI),CEU),IBS.2)`](../07_(((IBS.1,TSI),CEU),IBS.2)/report.md) | 1 | -2140.6 | -1665.6 | 2.2 | 1.8 | 25.75 | 11.68 | 0.443 | 0.000 | 0.000 |
+| 17 | [`(((IBS.1,TSI),IBS.2),CEU)`](../08_(((IBS.1,TSI),IBS.2),CEU)/report.md) | 1 | -2151.8 | -1676.8 | 2.2 | 2.7 | 27.18 | 13.75 | 0.881 | 0.000 | 0.000 |
+| 18 | [`(((IBS,TSI.1),TSI.2),CEU)`](../14_(((IBS,TSI.1),TSI.2),CEU)/report.md) | 1 | -2592.5 | -2117.5 | 3.3 | 8.7 | 22.07 | 184.57 | 0.998 | 0.000 | 0.000 |
+| 19 | [`(((CEU,TSI),IBS.1),IBS.2)`](../06_(((CEU,TSI),IBS.1),IBS.2)/report.md) | 1 | -2698.4 | -2223.5 | 5.1 | 7.9 | 10.76 | 399.72 | 0.156 | 0.000 | 0.000 |
+| 20 | [`((IBS,TSI),CEU)`](../03_((IBS,TSI),CEU)/report.md) | 0 | -2820.5 | -2345.5 | 2.2 | 1.1 | 27.82 | 208.96 | - | 0.000 | 0.000 |
+| 21 | [`((CEU,TSI),IBS)`](../02_((CEU,TSI),IBS)/report.md) | 0 | -2916.3 | -2441.3 | 0.9 | 15.4 | 14.90 | 388.68 | - | 0.000 | 0.000 |
 
 ![ranking](elbo_ranking.png)
 
 ## Selection
 
-- **Best model: `(((CEU,TSI.1),IBS),TSI.2)`**, ELBO +1288.2, P_model = 0.984, P_argmax = 1.000.
-- Runner-up `((CEU.1,IBS),(CEU.2,TSI))` is -4.1 nats behind. The winner's 6 restarts span 2.1 nats, and **6 of them beat the runner-up's best restart** -- the lead does not depend on the restart budget.
-- Best tree `((IBS,TSI),CEU)` vs best admixture graph `(((CEU,TSI.1),IBS),TSI.2)`: +1009.6 nats for 3 extra Ne, 2 extra times and 1 fraction.
+- **Best model: `(((CEU,IBS.1),TSI),IBS.2)`**, ELBO -475.0, P_model = 1.000, P_argmax = 1.000.
+- Runner-up `(((CEU,TSI.1),IBS),TSI.2)` is -91.7 nats behind. The winner's 6 restarts span 2.9 nats, and **6 of them beat the runner-up's best restart** -- the lead does not depend on the restart budget.
+- Best tree `((CEU,IBS),TSI)` vs best admixture graph `(((CEU,IBS.1),TSI),IBS.2)`: +1445.1 nats for 3 extra Ne, 2 extra times and 1 fraction.
 
 ## How to read the two probabilities
 
@@ -42,6 +42,6 @@
 
 ## Caveats that travel with these numbers
 
-1. The ELBO is a lower bound on log Z and the gap KL(q||p) differs per model, so a model whose posterior happens to be more Gaussian is rewarded for that alone. The importance-sampling `logZ` would correct it, but the ESS column shows the weights are degenerate (max ESS 58 of 4000), so `logZ` cannot be trusted here either.
+1. The ELBO is a lower bound on log Z and the gap KL(q||p) differs per model, so a model whose posterior happens to be more Gaussian is rewarded for that alone. The importance-sampling `logZ` would correct it, but the ESS column shows the weights are degenerate (max ESS 29 of 4000), so `logZ` cannot be trusted here either.
 2. An admixture graph splits the admixed leaf into two source branches with separate Ne -- it buys a piecewise Ne, which these data independently want. A win by an admixture graph is evidence for non-constant Ne at least as much as for admixture, and three leaves cannot separate the two. Check each folder's residual row for a monotone tilt before reading any result as admixture.
 3. These probabilities are conditional on the 21 listed models being the whole hypothesis space. Two admixture events, and non-constant Ne without admixture, are not in it.

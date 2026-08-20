@@ -1,9 +1,8 @@
 """Three-leaf fit: Pathfinder vs NUTS, with the composite likelihood decomposed.
 
 Three leaves is the smallest graph on which the SNP branch drifts are separately
-identifiable (see topologies.build_tree_3pop), and the leaves are screened for
-admixture with f3 first (clustering/f3_screen.py), because a negative f3 means the
-population cannot be a tree leaf at all -- and that is invisible on two leaves.
+identifiable (see topologies.build_tree_3pop).  Whether a leaf is actually a
+mixture is decided by the topology sweep in 3pop/, not by a pre-fit screen.
 
 kappa_snp is gone.  The IBD and SNP log-densities are simply added, which is the
 independent-product composite likelihood; w_se is now computed on 16 Mb blocks
@@ -146,8 +145,7 @@ json.dump({"pops": a.pops, "nodes": NODES, "w_hat": WH.tolist(), "w_se": WS.toli
 
 # Observed branch drifts straight from w_hat, for the model to be judged against.
 # f2 is invariant to the double-centering, so these are exactly the same numbers
-# the SNP likelihood sees -- no re-normalisation needed, unlike the Patterson-scale
-# f3 used for the admixture screen.
+# the SNP likelihood sees -- no re-normalisation needed.
 f2o = lambda i, j: WH[i, i] + WH[j, j] - 2 * WH[i, j]
 X_OBS = [(f2o(0, 1) + f2o(0, 2) - f2o(1, 2)) / 2,
          (f2o(0, 1) + f2o(1, 2) - f2o(0, 2)) / 2]

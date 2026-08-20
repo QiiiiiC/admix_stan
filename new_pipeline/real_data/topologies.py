@@ -132,11 +132,10 @@ def build_tree_3pop(pop_order):
     t-free quantity that can be compared directly against the IBD-side Ne ratio.
     On two leaves that comparison is impossible in principle, not just noisy.
 
-    Pick A and B with `clustering/f3_screen.py` first: a leaf needs non-negative
-    branch drift, and f3(A; B, C) < 0 says A is admixed and cannot be one.  That
-    screen rejected LWK (Z = -11.3), which the blind IBD clustering had selected
-    as the AFR leaf -- cohesion is a within-population criterion and is blind to
-    admixture, and so is any two-leaf fit.
+    Admixture is tested by the model itself: `3pop/enumerate_3pop.py` enumerates
+    every graph on these leaves with at most one admixture event and
+    `3pop/fit_topologies.py` ranks them, so a leaf that is really a mixture shows
+    up as an admixture graph winning rather than as a pre-fit exclusion.
     """
     leaves = list(pop_order)
     if len(leaves) != 3:

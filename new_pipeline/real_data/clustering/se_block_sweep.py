@@ -86,7 +86,7 @@ else:
     ok = (mu > a.min_maf) & (mu < 1 - a.min_maf) & ~np.isnan(mu) & ~np.isnan(F).any(1)
     dev, het, chrom = F[ok] - mu[ok, None], mu[ok] * (1 - mu[ok]), chrom[ok]
     print(f"[snp] {ok.sum():,}/{len(mu):,} SNPs kept (min_maf={a.min_maf})")
-    # Keep the raw per-population frequencies too: the unbiased f2/f3 estimators
+    # Keep the raw per-population frequencies too: the unbiased f2 estimators
     # need each population's OWN heterozygosity, which `dev` and the pooled `het`
     # (built from the cross-population mean) have already thrown away.
     np.savez_compressed(cache, dev=dev, het=het, chrom=chrom, F=F[ok].astype(np.float32))

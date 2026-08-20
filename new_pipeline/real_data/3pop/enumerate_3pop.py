@@ -203,10 +203,17 @@ def enumerate_all(pop_order):
             if key in seen:
                 continue
             seen[key] = True
+            # Build the representative whose canonical form IS the key.  Without
+            # this the name and the graph disagree whenever the swapped twin
+            # sorts first: the fit is identical (swapping sources is exactly the
+            # relabelling we quotient by, with f -> 1-f), but the NAME then says
+            # X.1 joins the branch that X.2 actually joins, which inverts how the
+            # reported admixture fraction reads.
+            rep = t if canonical(t) == key else swapped
             admix_models.append({
                 "n_admix": 1,
                 "admixed": adm,
-                "tree": t,
+                "tree": rep,
                 "newick": key,
                 "sources": (s1, s2),
                 "outside_first_merge_rule": not first_merge_involves(t, (s1, s2)),

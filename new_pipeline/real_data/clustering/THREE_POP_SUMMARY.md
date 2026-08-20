@@ -184,7 +184,6 @@ types against each other. This retro-justifies deleting `kappa_snp` rather than 
 ```
 clustering/
   THREE_POP_SUMMARY.md          <- this file
-  f3_screen.py                  leaf admixture screen (run BEFORE fitting)
   se_block_sweep.py             SE block-size measurement (kappa's replacement)
   fit_3pop.py                   fit + decomposition + figures + report
   results_3pop_<tag>/
@@ -193,6 +192,5 @@ clustering/
       spectrum_fit.png          observed vs fitted IBD spectrum + residuals, per pair
       likelihood_split.png      lp and chi2/n by component, term counts
       drift_and_Ne.png          fitted vs observed drift, Ne per leaf
-  results_screen/               f3 + SE-sweep caches and outputs
   results_noadmix/stan_data/    earlier 4-leaf inputs
 ```
