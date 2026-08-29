@@ -1,0 +1,40 @@
+How close is each selected cluster to a reported 1000G subpopulation?
+
+Diagnostic only -- the clustering never sees the panel, and nothing downstream
+depends on this file.  It exists to answer one question: did "most connected
+cluster >= min size" land on a real group, or on an arbitrary slice?
+
+Three overlap numbers, because "% overlap" is ambiguous for two sets of
+different size and each answers a different question:
+
+  purity  |C n S| / |C|   what fraction of the CLUSTER is that subpopulation.
+                          Low purity = the cluster pooled several groups, which
+                          is the substructure we were trying to remove.
+  recall  |C n S| / |S|   what fraction of the SUBPOPULATION was captured.
+                          Low recall = the cluster is a fragment of a real group.
+  Jaccard |C n S| / |C u S|   the symmetric one; 1.0 only if C == S exactly.
+
+Purity alone is not enough: a cluster of 5 GWD is 100% pure and 4% of GWD.
+
+route         pop     n  subpop  purity  recall   Jacc  composition of the selected cluster
+----------------------------------------------------------------------------------------------------------------------
+SNP kmeans    AFR    99     LWK   100%   100%   1.00  LWK 99/99
+SNP kmeans    EAS   104     JPT   100%   100%   1.00  JPT 104/104
+SNP kmeans    EUR   109     TSI    97%    99%   0.96  TSI 106/107, IBS 3/107
+SNP kmeans    SAS    67     GIH   100%    65%   0.65  GIH 67/103
+
+IBD louvain   AFR    99     LWK   100%   100%   1.00  LWK 99/99
+IBD louvain   EAS    93     CDX    99%    99%   0.98  CDX 92/93, CHB 1/103
+IBD louvain   EUR    99     FIN   100%   100%   1.00  FIN 99/99
+IBD louvain   SAS    78     GIH   100%    76%   0.76  GIH 78/103
+
+IBD spectral  AFR    99     LWK   100%   100%   1.00  LWK 99/99
+IBD spectral  EAS    93     CDX    99%    99%   0.98  CDX 92/93, CHB 1/103
+IBD spectral  EUR   100     FIN    99%   100%   0.99  FIN 99/99, CEU 1/99
+IBD spectral  SAS    87     GIH   100%    84%   0.84  GIH 87/103
+
+IBD dbscan    AFR    99     LWK   100%   100%   1.00  LWK 99/99
+IBD dbscan    EAS    91     CDX   100%    98%   0.98  CDX 91/93
+IBD dbscan    EUR    99     FIN   100%   100%   1.00  FIN 99/99
+IBD dbscan    SAS   440     STU    23%   100%   0.23  STU 102/102, ITU 100/102, GIH 93/103, BEB 85/86, PJL 60/96
+

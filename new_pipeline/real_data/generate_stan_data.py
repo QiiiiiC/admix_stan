@@ -7,8 +7,11 @@ which all operate on simulated ``tskit`` tree sequences.  Here the same two data
 products are produced directly from the files in ``real_data/merged_pruned``:
 
   1. SNP covariance  (w_hat, w_se)   -- the double-centered TreeMix covariance,
-     computed exactly as ``inference_methods.calculate_treemix_covariance`` does,
-     but fed a per-population allele-frequency matrix read from the phased VCFs.
+     computed by exactly the same estimator the simulation runs use,
+     ``inference_methods.resample_snp_covariance`` (pooled "ratio of sums"
+     TreeMix normalization + 1/n_haploid finite-sample bias correction +
+     sub-block jackknife SE), fed a per-population allele-frequency matrix read
+     from the phased VCFs.
 
   2. IBD sharing fractions (ibd_mean, ibd_var) per length bin -- IBD segments
      called by hap-IBD / FastSMC are binned by genetic length and turned into
@@ -55,6 +58,7 @@ Run with the project's stan env, e.g.:
 """
 
 import os
+import re
 import sys
 import gzip
 import glob
@@ -67,20 +71,23 @@ from collections import defaultdict
 
 import numpy as np
 
-# Reuse the existing SNP covariance estimator so the real-data SNP product is
-# computed by exactly the same code path as the simulation pipeline.
+# Reuse the new-pipeline SNP covariance estimator so the real-data SNP product
+# is computed by exactly the same code path as the simulation run files
+# (resample_snp_covariance), not the older per-SNP-standardized variant.
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _PARENT = os.path.dirname(_THIS_DIR)
 if _PARENT not in sys.path:
     sys.path.insert(0, _PARENT)
-from inference_methods import calculate_treemix_covariance  # noqa: E402
+from inference_methods import resample_snp_covariance  # noqa: E402
 
 
-# Default genome-wide length bins (cM), matching the simulation runners.
+# Default genome-wide length bins (cM), matching the simulation run files
+# exactly (1.0 cM lower edge .. 50 cM) so real- and simulated-data parameter
+# recovery use the same bins.
 DEFAULT_BINS = [
-    [0.5, 0.55], [0.55, 0.6], [0.6, 0.65], [0.65, 0.7], [0.7, 0.8],
-    [0.8, 0.9], [0.9, 1.0], [1.0, 1.5], [1.5, 2.0], [2.0, 5.0],
-    [5.0, 8.0], [8.0, 20.0], [20.0, 50.0],
+    [1.0, 1.25], [1.25, 1.5], [1.5, 1.75], [1.75, 2.0], [2.0, 2.5],
+    [2.5, 3.0], [3.0, 4.0], [4.0, 5.0], [5.0, 6.0], [6.0, 7.5],
+    [7.5, 12.0], [12.0, 20.0], [20.0, 300],
 ]
 
 DEFAULT_POP_ORDER = ["AFR", "AMR", "EAS", "EUR", "SAS"]
@@ -90,6 +97,65 @@ PLOIDY = 2
 # Smallest reported segment length (cM): default to the lowest bin boundary so
 # every bin can be populated by the IBD caller.
 DEFAULT_MIN_CM = min(b[0] for b in DEFAULT_BINS)
+
+# Anomalous genomic regions masked from the IBD product (bp, GRCh37).  At these
+# loci the genetic map has a large cM discontinuity over a tiny physical span, so
+# a single IBS match is logged as a spurious multi-cM segment, flooding the short
+# length bins.  This is our analog of HapNe excluding HLA / the chr8 inversion.
+#   chr2  ~3.0  Mb : 3.93 cM jump across 31 kb (3.030-3.061 Mb) -> ~288k fake segs
+#   chr21 ~17.85 Mb: same local cM-discontinuity artifact       -> ~177k fake segs
+DEFAULT_BAD_REGIONS = {
+    "2":  [(2_850_000, 3_150_000)],
+    "21": [(17_700_000, 18_100_000)],
+}
+
+
+def _norm_chrom(chrom):
+    """'chr22' / '22' -> '22'."""
+    chrom = str(chrom)
+    return chrom[3:] if chrom.lower().startswith("chr") else chrom
+
+
+def load_bad_regions(path):
+    """Read a BED-like mask file (chrom start end per line) -> {chrom:[(s,e)]}."""
+    regions = {}
+    with open_any(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith(("#", "track", "browser")):
+                continue
+            parts = line.split()
+            c = _norm_chrom(parts[0])
+            regions.setdefault(c, []).append(
+                (int(float(parts[1])), int(float(parts[2])))
+            )
+    return regions
+
+
+def _in_bad_region(bad_regions, chrom, start_bp, end_bp):
+    """True if segment [start,end] bp overlaps any masked window on this chrom."""
+    wins = bad_regions.get(_norm_chrom(chrom))
+    if not wins:
+        return False
+    for (ws, we) in wins:
+        if start_bp < we and end_bp > ws:
+            return True
+    return False
+
+
+def _chrom_from_name(name):
+    """Extract chromosome label from a file name like ...chr21_pruned.vcf.gz."""
+    m = re.search(r"chr([0-9]+|X|Y)", os.path.basename(name))
+    return m.group(1) if m else None
+
+
+def _ibd_file_chrom(path, col_chrom=4):
+    """Fallback: read the chromosome from the first data line of an IBD file."""
+    with open_any(path) as f:
+        for line in f:
+            if line.strip() and not line.startswith("#"):
+                return _norm_chrom(line.split()[col_chrom])
+    return None
 
 # ---- FastSMC (ASMC suite) defaults, mirroring the simulation runner ----
 FASTSMC_DEMOGRAPHY     = "CEU"                      # built-in code or path to .demo
@@ -111,6 +177,19 @@ def open_any(path):
     if str(path).endswith(".gz"):
         return gzip.open(path, "rt")
     return open(path, "r")
+
+
+def base_id(s):
+    """Canonical sample key: strip the plink FID_IID doubling.
+
+    'HG00096_HG00096' -> 'HG00096'; 'HG00096' is unchanged.  The two data
+    sources disagree on this: the pruned VCFs were written through plink and
+    carry the doubled form, while the high_cov IBD files carry plain 1000G IDs.
+    Everything that joins the two -- the label table, the haplotype index and
+    the IBD lookup -- goes through this one key so they cannot drift apart.
+    1000G sample IDs contain no underscore of their own.
+    """
+    return s.split("_")[0]
 
 
 def load_population_labels(labels_file, pop_order):
@@ -136,7 +215,7 @@ def load_population_labels(labels_file, pop_order):
                     f"Population {pop!r} for sample {sample_id!r} not in "
                     f"pop_order {pop_order}."
                 )
-            sample_to_pop[sample_id] = pop_to_idx[pop]
+            sample_to_pop[base_id(sample_id)] = pop_to_idx[pop]
     print(f"[labels] {len(sample_to_pop)} samples across {len(pop_order)} pops "
           f"({pop_order})")
     return sample_to_pop
@@ -171,7 +250,8 @@ def build_haplotype_index(sample_names, sample_to_pop, pop_order):
     n_pops = len(pop_order)
     counters = [0] * n_pops
     hap_local = {}
-    for s in sample_names:
+    for s_raw in sample_names:
+        s = base_id(s_raw)
         if s not in sample_to_pop:
             # Sample present in VCF but unlabeled -> skip entirely.
             continue
@@ -195,9 +275,17 @@ def load_genmap(genmap_dir, chrom):
 
     Returns (bp_positions, cM_positions) sorted by bp, for np.interp.
     """
-    pattern = os.path.join(genmap_dir, f"plink.chr{chrom}.GRCh37.map")
-    if not os.path.exists(pattern):
-        raise FileNotFoundError(f"Genetic map not found: {pattern}")
+    # The genome build is a property of the map directory, not of this call:
+    # merged_pruned/genmap is GRCh37 while high_cov/genmap is GRCh38, and the
+    # two are never mixed within a run.  Probe the known names rather than
+    # hardcoding one build, so pointing --genmap-dir at either just works.
+    candidates = [os.path.join(genmap_dir, f"plink.chr{chrom}.{b}.map")
+                  for b in ("GRCh37", "GRCh38")]
+    candidates += [os.path.join(genmap_dir, f"plink.chr{chrom}.map")]
+    pattern = next((p for p in candidates if os.path.exists(p)), None)
+    if pattern is None:
+        raise FileNotFoundError(
+            f"Genetic map for chr{chrom} not found; tried: {candidates}")
     bp, cm = [], []
     with open_any(pattern) as f:
         for line in f:
@@ -240,8 +328,8 @@ def compute_allele_freq_matrix(vcf_paths, sample_names, sample_to_pop, pop_order
     # Column index lists per population (into the genotype fields parts[9:]).
     pop_cols = [[] for _ in range(n_pops)]
     for col, s in enumerate(sample_names):
-        if s in sample_to_pop:
-            pop_cols[sample_to_pop[s]].append(col)
+        if base_id(s) in sample_to_pop:
+            pop_cols[sample_to_pop[base_id(s)]].append(col)
     pop_cols = [np.asarray(c, dtype=int) for c in pop_cols]
     # 2 alleles per diploid sample.
     pop_n_alleles = np.array([PLOIDY * len(c) for c in pop_cols], dtype=float)
@@ -279,14 +367,57 @@ def compute_allele_freq_matrix(vcf_paths, sample_names, sample_to_pop, pop_order
     return F
 
 
+AUTOSOME_MB = 2875.0        # GRCh38 autosomal, non-N
+
+
 def compute_snp_covariance(vcf_paths, sample_names, sample_to_pop, pop_order,
-                           block_size_snps=500, min_maf=0.0, max_sites=None):
-    """Build (w_hat, w_se) via the existing TreeMix covariance estimator."""
+                           n_haps, se_block_size=None, se_block_mb=16.0,
+                           min_maf=0.0, max_sites=None):
+    """Build (w_hat, w_se) with the SAME estimator the simulation runs use.
+
+    This mirrors ``inference_methods.resample_snp_covariance`` exactly -- the
+    pooled TreeMix "ratio of sums" covariance ``sum(dev_i dev_j) / sum(het)``,
+    the 1/n_haploid finite-sample bias correction, and the ``se_block_size``-SNP
+    sub-block jackknife SE -- rather than the per-SNP-standardized
+    ``calculate_treemix_covariance``.  Per-SNP deviations are formed against the
+    cross-population mean (``mu = mean over pops``), exactly as
+    ``inference_methods.prepare_snp_blocks`` does for the simulated data.
+
+    For a full real genome we use every SNP once (no block resampling), so the
+    (dev, het) pairs are handed over as a single genome-wide block:
+    ``resample_snp_covariance`` re-chunks the concatenation into ``se_block_size``
+    sub-blocks for the jackknife SE regardless, so this reproduces the run-file
+    estimate exactly.
+    """
     F = compute_allele_freq_matrix(
         vcf_paths, sample_names, sample_to_pop, pop_order, max_sites=max_sites
     )
-    w_hat, w_se = calculate_treemix_covariance(
-        F, block_size_snps=block_size_snps, min_maf=min_maf
+
+    # Pooled (cross-population) mean per SNP, matching prepare_snp_blocks.
+    mu = np.nanmean(F, axis=1)
+    valid = (
+        (mu > min_maf) & (mu < 1.0 - min_maf)
+        & ~np.isnan(mu) & ~np.isnan(F).any(axis=1)
+    )
+    dev = F[valid] - mu[valid, None]          # (n_snps, n_pops) deviations
+    het = mu[valid] * (1.0 - mu[valid])       # (n_snps,) heterozygosities
+    print(f"[snp] {int(valid.sum())}/{F.shape[0]} SNPs kept after MAF filter "
+          f"(min_maf={min_maf})")
+
+    # TreeMix's rule is about the block's PHYSICAL length, not its SNP count, so
+    # derive the count from this panel's own density rather than hardcoding one.
+    n_kept = int(valid.sum())
+    if se_block_size is None:
+        density = n_kept / AUTOSOME_MB
+        se_block_size = max(1, int(round(se_block_mb * density)))
+        print(f"[snp] density {density:.0f} SNPs/Mb -> {se_block_size} SNPs per "
+              f"{se_block_mb:g} Mb SE block ({n_kept // se_block_size} blocks)")
+
+    snp_blocks = [(dev, het)]                  # one genome-wide block
+    w_hat, w_se = resample_snp_covariance(
+        snp_blocks, chosen_blocks=[0],
+        n_haploid_per_pop=np.asarray(n_haps, dtype=float),
+        se_block_size=se_block_size,
     )
     print(f"[snp] w_hat range [{w_hat.min():.3e}, {w_hat.max():.3e}], "
           f"w_se range [{w_se.min():.3e}, {w_se.max():.3e}]")
@@ -325,7 +456,7 @@ def _run_cmd(cmd, quiet=True):
     return res
 
 
-def run_hapibd(vcf_path, map_path, out_prefix, min_seed=2.0,
+def run_hapibd(vcf_path, map_path, out_prefix, min_seed=DEFAULT_MIN_CM,
                min_output=DEFAULT_MIN_CM, threads=1, quiet=True):
     """
     Run hap-IBD on a real (bgzipped) VCF + PLINK genetic map.
@@ -364,6 +495,34 @@ def run_hapibd(vcf_path, map_path, out_prefix, min_seed=2.0,
     raise FileNotFoundError(f"hap-ibd produced no .ibd[.gz] for {out_prefix}")
 
 
+def merge_ibd_segments(in_path, vcf_path, map_path, out_path, jar,
+                       gap=0.6, discord=1, java="java"):
+    """Post-process a hap-IBD segment file with Browning's merge-ibd-segments.
+
+    Rejoins segments split by phasing/genotyping errors (gap < ``gap`` cM with
+    <= ``discord`` inconsistent genotypes) -- HapNe's standard input step.
+
+    merge-ibd-segments expects the 9-column Refined-IBD format (LOD at col 8, cM
+    at col 9) and sets merged haplotype indices to 0, so we (a) insert a dummy
+    LOD column before merging, (b) take the map-recomputed cM (col 9) as the
+    length afterwards, and (c) map hap index 0 -> 1 so the per-haplotype
+    jackknife still has a valid slot (the mean spectrum is unaffected).
+
+    Returns the path to the merged ``.ibd.gz``.
+    """
+    reader = "gunzip -c" if in_path.endswith(".gz") else "cat"
+    pre = r"""awk 'BEGIN{OFS="\t"}{print $1,$2,$3,$4,$5,$6,$7,"1.0",$8}'"""
+    post = (r"""awk 'BEGIN{OFS="\t"}{h2=($2==0?1:$2); h4=($4==0?1:$4); """
+            r"""print $1,h2,$3,h4,$5,$6,$7,$9}'""")
+    cmd = (f"{reader} {in_path} | {pre} "
+           f"| {java} -jar {jar} {vcf_path} {map_path} {gap} {discord} "
+           f"| {post} | gzip > {out_path}")
+    t0 = time.time()
+    _run_cmd(cmd)
+    print(f"  [merge-ibd] {time.time() - t0:.1f}s -> {os.path.basename(out_path)}")
+    return out_path
+
+
 def write_oxford_inputs(vcf_path, genmap_dir, chrom, sample_to_pop, out_dir,
                         prefix):
     """
@@ -385,7 +544,8 @@ def write_oxford_inputs(vcf_path, genmap_dir, chrom, sample_to_pop, out_dir,
     map_path = in_root + ".map"
 
     sample_names_all = read_vcf_samples(vcf_path)
-    keep_cols = [i for i, s in enumerate(sample_names_all) if s in sample_to_pop]
+    keep_cols = [i for i, s in enumerate(sample_names_all)
+                 if base_id(s) in sample_to_pop]
     sample_names = [sample_names_all[i] for i in keep_cols]
     keep_cols = np.asarray(keep_cols, dtype=int)
 
@@ -561,7 +721,7 @@ def accumulate_ibd_segments(ibd_files, hap_local, n_haps, pop_order, bins,
                             genmap_dir, genome_cm=None, chrom_filter=None,
                             col_id1=0, col_hap1=1, col_id2=2, col_hap2=3,
                             col_chrom=4, col_start=5, col_end=6, col_cm=7,
-                            length_from_map=False):
+                            length_from_map=False, bad_regions=None):
     """
     One pass over hap-IBD / FastSMC segment files, accumulating the sufficient
     statistics for the haplotype jackknife.
@@ -620,6 +780,7 @@ def accumulate_ibd_segments(ibd_files, hap_local, n_haps, pop_order, bins,
     # Accumulate raw segment lengths (cM); divide by genome_cm at the end once
     # we know which chromosomes contributed.
     S = defaultdict(float)
+    C = defaultdict(int)          # (b_i, i, j) -> number of segments
     hap_sum_i = {}
     hap_sum_j = {}
     chroms_seen = set()
@@ -632,6 +793,7 @@ def accumulate_ibd_segments(ibd_files, hap_local, n_haps, pop_order, bins,
         return hap_sum_i[key], hap_sum_j[key]
 
     n_total = n_kept = n_skip_unmapped = n_skip_bin = n_skip_chrom = 0
+    n_skip_region = 0
 
     for path in ibd_files:
         with open_any(path) as f:
@@ -647,21 +809,26 @@ def accumulate_ibd_segments(ibd_files, hap_local, n_haps, pop_order, bins,
                     n_skip_chrom += 1
                     continue
 
+                start_bp = float(parts[col_start])
+                end_bp = float(parts[col_end])
+                if bad_regions and _in_bad_region(bad_regions, chrom,
+                                                  start_bp, end_bp):
+                    n_skip_region += 1
+                    continue
+
                 s1, s2 = parts[col_id1], parts[col_id2]
                 # hap-IBD haplotype field is 1/2 -> slot 0/1.
                 h1 = int(parts[col_hap1]) - 1
                 h2 = int(parts[col_hap2]) - 1
 
-                k1 = (s1, h1)
-                k2 = (s2, h2)
+                k1 = (base_id(s1), h1)
+                k2 = (base_id(s2), h2)
                 if k1 not in hap_local or k2 not in hap_local:
                     n_skip_unmapped += 1
                     continue
 
                 if length_from_map:
                     mb, mc = get_map(chrom)
-                    start_bp = float(parts[col_start])
-                    end_bp = float(parts[col_end])
                     length_cm = float(
                         bp_to_cm(end_bp, mb, mc) - bp_to_cm(start_bp, mb, mc)
                     )
@@ -683,6 +850,7 @@ def accumulate_ibd_segments(ibd_files, hap_local, n_haps, pop_order, bins,
 
                 chroms_seen.add(chrom)
                 S[(b_i, i, j)] += length_cm      # raw cM; normalized below
+                C[(b_i, i, j)] += 1
                 buf_i, buf_j = get_buffers(b_i, i, j)
                 if i == j:
                     # within-pop: both haplotypes contribute to the same array.
@@ -697,14 +865,30 @@ def accumulate_ibd_segments(ibd_files, hap_local, n_haps, pop_order, bins,
 
     # --- Determine the genetic-length normalizer and convert cM -> fraction ---
     if genome_cm is None:
-        if chrom_filter_norm is not None:
-            mb, mc = get_map(chrom_filter_norm)
-            genome_cm = chromosome_cm_span(mb, mc)
-        else:
-            genome_cm = 0.0
-            for c in sorted(chroms_seen):
+        norm_chroms = ([chrom_filter_norm] if chrom_filter_norm is not None
+                       else sorted(chroms_seen))
+        genome_cm = 0.0
+        for c in norm_chroms:
+            mb, mc = get_map(c)
+            genome_cm += chromosome_cm_span(mb, mc)
+
+        # Masked regions were removed from the numerator, so drop their genetic
+        # length from the denominator too (keeps the fraction consistent: IBD cM
+        # outside the mask / observable genetic length outside the mask).
+        masked_cm = 0.0
+        if bad_regions:
+            for c in norm_chroms:
+                wins = bad_regions.get(_norm_chrom(c))
+                if not wins:
+                    continue
                 mb, mc = get_map(c)
-                genome_cm += chromosome_cm_span(mb, mc)
+                for (ws, we) in wins:
+                    masked_cm += float(bp_to_cm(we, mb, mc)
+                                       - bp_to_cm(ws, mb, mc))
+        if masked_cm:
+            print(f"[ibd] masked genetic length dropped from normalizer: "
+                  f"{masked_cm:.3f} cM")
+            genome_cm -= masked_cm
     print(f"[ibd] chromosomes used: {sorted(chroms_seen)} -> "
           f"normalizer {genome_cm:.2f} cM")
 
@@ -718,8 +902,8 @@ def accumulate_ibd_segments(ibd_files, hap_local, n_haps, pop_order, bins,
 
     print(f"[ibd] segments: {n_total} read, {n_kept} kept, "
           f"{n_skip_unmapped} unmapped-haplotype, {n_skip_bin} out-of-bin, "
-          f"{n_skip_chrom} other-chromosome")
-    return dict(S), hap_sum_i, hap_sum_j, genome_cm
+          f"{n_skip_chrom} other-chromosome, {n_skip_region} in-masked-region")
+    return dict(S), dict(C), hap_sum_i, hap_sum_j, genome_cm
 
 
 def _jackknife_within(S, hap_sums, n):
@@ -829,11 +1013,24 @@ def compute_ibd_matrices(S, hap_sum_i, hap_sum_j, n_haps, bins, se_floor=1e-8):
     return ibd_mean, ibd_var
 
 
+def compute_count_matrices(C, n_bins, n_pops):
+    """Per-bin symmetric segment-count matrices {b_i: (n_pops, n_pops) int}."""
+    ibd_count = {}
+    for b_i in range(n_bins):
+        mat = np.zeros((n_pops, n_pops), dtype=np.int64)
+        for i in range(n_pops):
+            for j in range(i, n_pops):
+                mat[i, j] = mat[j, i] = int(C.get((b_i, i, j), 0))
+        ibd_count[b_i] = mat
+    return ibd_count
+
+
 # ----------------------------------------------------------------------
 # Saving / assembling
 # ----------------------------------------------------------------------
 def save_outputs(out_prefix, pop_order, n_haps, bins, genome_cm,
-                 w_hat=None, w_se=None, ibd_mean=None, ibd_var=None):
+                 w_hat=None, w_se=None, ibd_mean=None, ibd_var=None,
+                 ibd_count=None):
     """Save matrices to <prefix>.npz and metadata to <prefix>.json."""
     n_bins = len(bins)
     n_pops = len(pop_order)
@@ -845,6 +1042,8 @@ def save_outputs(out_prefix, pop_order, n_haps, bins, genome_cm,
     if ibd_mean is not None:
         arrays["ibd_mean"] = np.stack([ibd_mean[b] for b in range(n_bins)])
         arrays["ibd_var"] = np.stack([ibd_var[b] for b in range(n_bins)])
+    if ibd_count is not None:
+        arrays["ibd_count"] = np.stack([ibd_count[b] for b in range(n_bins)])
 
     npz_path = out_prefix + ".npz"
     np.savez_compressed(npz_path, **arrays)
@@ -906,10 +1105,12 @@ def assemble_stan_data(dem, npz_path, json_path, model="mixed", T_max=None,
             T_max=T_max, se_floor=se_floor, cm=genome_cm,
         )
     if model == "mixed":
+        ibd_count = ({b: data["ibd_count"][b] for b in range(len(bins))}
+                     if "ibd_count" in data.files else None)
         return build_mixed_stan_data(
             dem, ibd_mean, ibd_var, bins, data["w_hat"], data["w_se"],
             n_samples_per_pop=n_samples, T_max=T_max, se_floor=se_floor,
-            cm=genome_cm,
+            cm=genome_cm, ibd_count=ibd_count,
         )
     raise ValueError(f"Unknown model {model!r}")
 
@@ -944,13 +1145,30 @@ def main():
     ap.add_argument("--out", default=os.path.join(_THIS_DIR, "real_stan_data"),
                     help="Output prefix (writes <prefix>.npz and <prefix>.json)")
     ap.add_argument("--pop-order", nargs="+", default=DEFAULT_POP_ORDER)
-    ap.add_argument("--block-size-snps", type=int, default=500)
+    ap.add_argument("--block-size-mb", type=float, default=16.0,
+                    help="Target PHYSICAL length of a covariance-SE block, in Mb; "
+                         "the SNP count is derived from the panel's own density. "
+                         "TreeMix's criterion is a physical one -- blocks 'larger "
+                         "than blocks of linkage disequilibrium' -- and the paper's "
+                         "k=500 was 10 Mb (HGDP, 124k SNPs) and 20 Mb (dog, 61k "
+                         "SNPs).  Carrying the NUMBER 500 across to a denser panel "
+                         "silently shrinks the block: at our 125 SNPs/Mb it is only "
+                         "4 Mb, which understates every SE by ~1.22x.  Default 16 Mb "
+                         "sits inside TreeMix's own 10-20 Mb range and is where our "
+                         "measured SE plateaus.")
+    ap.add_argument("--block-size-snps", type=int, default=None,
+                    help="Override --block-size-mb with a fixed SNP count.")
     ap.add_argument("--min-maf", type=float, default=0.0)
     ap.add_argument("--max-sites", type=int, default=None,
                     help="Cap on number of SNP sites (debugging).")
+    ap.add_argument("--bins-uniform", nargs=3, type=float, default=None,
+                    metavar=("LO", "HI", "WIDTH"),
+                    help="Use uniform-width length bins from LO to HI cM with "
+                         "step WIDTH (e.g. '2 20.5 0.5' for HapNe-style bins). "
+                         "Overrides the default unequal bins.")
     ap.add_argument("--min-cm", type=float, default=DEFAULT_MIN_CM,
                     help="Minimum reported IBD segment length (cM).")
-    ap.add_argument("--hapibd-min-seed", type=float, default=2.0,
+    ap.add_argument("--hapibd-min-seed", type=float, default=DEFAULT_MIN_CM,
                     help="hap-IBD min-seed length (cM).")
     ap.add_argument("--threads", type=int, default=1,
                     help="Threads for the IBD caller.")
@@ -960,6 +1178,31 @@ def main():
     ap.add_argument("--length-from-map", action="store_true",
                     help="Compute IBD segment length from start/end bp via the "
                          "genetic map instead of trusting the segment's cM column.")
+    # --- Bad-region masking (anomalous cM-discontinuity loci) ---
+    ap.add_argument("--mask-regions", default=None,
+                    help="BED-like file (chrom start end) of regions to drop from "
+                         "the IBD product; replaces the built-in default list.")
+    ap.add_argument("--no-mask-regions", action="store_true",
+                    help="Disable IBD region masking (default masks the built-in "
+                         "chr2/chr21 cM-discontinuity artifacts).")
+    # --- merge-ibd-segments post-processing (HapNe's step) ---
+    ap.add_argument("--merge-ibd-segments", action="store_true",
+                    help="Run Browning's merge-ibd-segments on the hap-IBD output "
+                         "before binning (rejoins error-split segments).")
+    ap.add_argument("--merge-jar",
+                    default=os.path.join(_THIS_DIR, "tools", "merge-ibd-segments.jar"),
+                    help="Path to merge-ibd-segments.jar.")
+    ap.add_argument("--merge-vcf-glob", default=None,
+                    help="With --ibd-method file: glob for the (dense) phased VCFs "
+                         "used to detect the precomputed IBD, needed for merging.")
+    ap.add_argument("--merge-gap", type=float, default=0.6,
+                    help="merge-ibd-segments max gap (cM). Default 0.6.")
+    ap.add_argument("--merge-discord", type=int, default=1,
+                    help="merge-ibd-segments max inconsistent genotypes. Default 1.")
+    ap.add_argument("--merge-out-dir", default=None,
+                    help="Where to write merged .ibd.gz (default: <out>_merged_ibd).")
+    ap.add_argument("--java", default="java",
+                    help="Java command for merge-ibd-segments (default: java).")
     ap.add_argument("--chrom", default=None,
                     help="Restrict to a single chromosome (e.g. 22). Selects the "
                          "matching VCF and normalizes IBD fractions by that "
@@ -972,7 +1215,25 @@ def main():
     labels = args.labels or os.path.join(data_dir, "population_labels_simple.txt")
     genmap_dir = args.genmap_dir or os.path.join(data_dir, "genmap")
     pop_order = args.pop_order
-    bins = DEFAULT_BINS
+    if args.bins_uniform:
+        lo, hi, w = args.bins_uniform
+        edges = np.arange(lo, hi + 1e-9, w)
+        bins = [[float(edges[k]), float(edges[k + 1])] for k in range(len(edges) - 1)]
+        print(f"[bins] uniform {lo}-{hi} cM, width {w}: {len(bins)} bins")
+    else:
+        bins = DEFAULT_BINS
+
+    if args.no_mask_regions:
+        bad_regions = None
+        print("[mask] region masking disabled")
+    elif args.mask_regions:
+        bad_regions = load_bad_regions(args.mask_regions)
+        print(f"[mask] {sum(len(v) for v in bad_regions.values())} regions from "
+              f"{args.mask_regions}")
+    else:
+        bad_regions = DEFAULT_BAD_REGIONS
+        print(f"[mask] default bad regions: "
+              f"{ {c: v for c, v in bad_regions.items()} }")
 
     if args.vcf_glob:
         vcf_glob = args.vcf_glob
@@ -994,12 +1255,13 @@ def main():
     w_hat = w_se = None
     if not args.skip_snp:
         w_hat, w_se = compute_snp_covariance(
-            vcf_paths, sample_names, sample_to_pop, pop_order,
-            block_size_snps=args.block_size_snps, min_maf=args.min_maf,
+            vcf_paths, sample_names, sample_to_pop, pop_order, n_haps,
+            se_block_size=args.block_size_snps, se_block_mb=args.block_size_mb,
+            min_maf=args.min_maf,
             max_sites=args.max_sites,
         )
 
-    ibd_mean = ibd_var = None
+    ibd_mean = ibd_var = ibd_count = None
     genome_cm = None
 
     if args.ibd_method == "none":
@@ -1048,16 +1310,52 @@ def main():
                 )
                 ibd_files.append(seg)
 
-        S, hap_sum_i, hap_sum_j, genome_cm = accumulate_ibd_segments(
+        # --- merge-ibd-segments post-processing (HapNe's step) ---
+        if args.merge_ibd_segments:
+            if not os.path.exists(args.merge_jar):
+                raise FileNotFoundError(f"merge jar not found: {args.merge_jar}")
+            merge_dir = args.merge_out_dir or (args.out + "_merged_ibd")
+            os.makedirs(merge_dir, exist_ok=True)
+            if args.ibd_method == "file":
+                if not args.merge_vcf_glob:
+                    raise ValueError("--merge-ibd-segments with --ibd-method file "
+                                     "requires --merge-vcf-glob (the dense VCFs).")
+                chrom_to_mvcf = {}
+                for p in sorted(glob.glob(args.merge_vcf_glob)):
+                    cc = _chrom_from_name(p)
+                    if cc:
+                        chrom_to_mvcf[cc] = p
+            else:
+                chrom_to_mvcf = chrom_to_vcf   # same (dense) VCFs used to detect
+            merged_files = []
+            for seg in ibd_files:
+                c = _chrom_from_name(seg) or _ibd_file_chrom(seg)
+                if c is None or c not in chrom_to_mvcf:
+                    raise FileNotFoundError(
+                        f"No merge VCF for chromosome {c!r} (segment file {seg}).")
+                out = os.path.join(merge_dir, f"hapibd_chr{c}.merged.ibd.gz")
+                print(f"[ibd] merging chr{c} ...")
+                merge_ibd_segments(
+                    seg, chrom_to_mvcf[c], genmap_file_for(genmap_dir, c), out,
+                    args.merge_jar, gap=args.merge_gap,
+                    discord=args.merge_discord, java=args.java,
+                )
+                merged_files.append(out)
+            ibd_files = merged_files
+
+        S, C, hap_sum_i, hap_sum_j, genome_cm = accumulate_ibd_segments(
             ibd_files, hap_local, n_haps, pop_order, bins, genmap_dir,
             chrom_filter=args.chrom, length_from_map=args.length_from_map,
+            bad_regions=bad_regions,
         )
         ibd_mean, ibd_var = compute_ibd_matrices(
             S, hap_sum_i, hap_sum_j, n_haps, bins,
         )
+        ibd_count = compute_count_matrices(C, len(bins), len(pop_order))
 
     save_outputs(args.out, pop_order, n_haps, bins, genome_cm,
-                 w_hat=w_hat, w_se=w_se, ibd_mean=ibd_mean, ibd_var=ibd_var)
+                 w_hat=w_hat, w_se=w_se, ibd_mean=ibd_mean, ibd_var=ibd_var,
+                 ibd_count=ibd_count if ibd_mean is not None else None)
 
 
 if __name__ == "__main__":

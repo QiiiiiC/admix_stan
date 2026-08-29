@@ -192,7 +192,14 @@ model {
     // variation, so there is no funnel between Ne and sigma_log.  Each Ne has
     // median pinned at 15000; the marginal prior is mean ~16200, SD ~7400
     // (a log-normal's mean sits above its median).
-    mu_log    ~ normal(log(15000), 0.25);  // log-scale location; median Ne = 15000
+    mu_log    ~ normal(log(15000), 0.53);  // log-scale location; median Ne = 15000
+    // 0.53 = sqrt(trigamma(4)), the log-scale sd of the gamma(4, 4/15000) prior
+    // that Nfixed puts on effective_N -- so Nsmooth and Nfixed now express the
+    // SAME prior belief about the LEVEL of Ne and differ only in whether it may
+    // vary across the graph.  At the old 0.25 the two were not comparable: +-28%
+    // at 1 sigma made Ne = 3,300 a ~6-sigma excursion, so SNP-only-Nsmooth on the
+    // AFR-EUR two-leaf test reported the prior (Ne = 10,100, g ratio 0.35) while
+    // SNP-only-Nfixed reached the data (Ne = 3,323, g ratio 1.00).
     sigma_log ~ normal(0, 0.3);            // half-normal (sigma_log >= 0); per-node spread
     Ne_raw    ~ std_normal();
 

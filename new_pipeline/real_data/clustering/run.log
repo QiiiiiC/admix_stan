@@ -1,0 +1,56 @@
+[panel] 2504 reported subpopulation labels from integrated_call_samples_v3.20130502.ALL.panel
+[load] AFR: 661 individuals
+[load] EAS: 504 individuals
+[load] EUR: 503 individuals
+[load] SAS: 489 individuals
+[ibd] building co-ancestry matrices, segments [2, inf) cM ...
+[snp] loading genotypes (<= 20000 SNPs, stride 10) ...
+[snp] genotype matrix (2157, 20000) (samples x snps)
+[ibd] AFR: n=661 algo=spectral K=4 noise=0 -> keep 99 (most cohesive of 4 clusters >= 50)
+        louvain   334(0.40) 112(0.42) *99(0.96) 86(0.56) 7(0.62) 5(0.70) 5(0.50) 3(1.00) 2(1.00) 2(1.00) 2(1.00) 2(1.00) 2(1.00)
+        spectral  364(0.37) 112(0.42) *99(0.96) 86(0.56)
+        dbscan    307(0.44) 107(0.44) *99(0.96) 83(0.59)
+[ibd] EAS: n=504 algo=spectral K=5 noise=0 -> keep 93 (most cohesive of 4 clusters >= 50)
+        louvain   134(0.30) 122(0.19) 99(0.53) *93(0.67) 56(0.41)
+        spectral  155(0.15) 116(0.38) 99(0.53) *93(0.67) 41(0.63)
+        dbscan    389(0.15) *91(0.69)
+[ibd] EUR: n=503 algo=spectral K=4 noise=0 -> keep 100 (most cohesive of 3 clusters >= 50)
+        louvain   380(0.31) *99(1.00) 24(0.99)
+        spectral  275(0.40) 102(0.38) *100(1.00) 26(0.93)
+        dbscan    257(0.41) *99(1.00) 95(0.41) 24(0.99)
+[ibd] SAS: n=489 algo=spectral K=4 noise=0 -> keep 87 (most cohesive of 4 clusters >= 50)
+        louvain   259(0.12) 87(0.59) *78(0.83) 39(0.88) 8(0.96) 5(1.00) 4(1.00) 3(1.00) 2(1.00) 2(1.00) 2(1.00)
+        spectral  180(0.12) 166(0.29) *87(0.71) 56(0.55)
+        dbscan    *440(0.14) 36(0.97)
+[snp] AFR: n=661 kmeans K=4 sil=0.66 -> keep 99 (most cohesive of 4 clusters >= 50)
+        222(0.70) 198(0.63) *99(0.79) 88(0.48)
+        var%=[0.86, 0.5, 0.4, 0.31, 0.27, 0.27, 0.26]
+[snp] EAS: n=504 kmeans K=4 sil=0.46 -> keep 104 (most cohesive of 4 clusters >= 50)
+        201(0.44) 114(0.43) *104(0.57) 85(0.40)
+        var%=[0.98, 0.45, 0.35, 0.28, 0.28, 0.27, 0.27]
+[snp] EUR: n=503 kmeans K=4 sil=0.45 -> keep 109 (most cohesive of 4 clusters >= 50)
+        191(0.43) *109(0.54) 104(0.34) 99(0.53)
+        var%=[0.74, 0.37, 0.3, 0.29, 0.27, 0.27, 0.27]
+[snp] SAS: n=489 kmeans K=3 sil=0.51 -> keep 67 (most cohesive of 3 clusters >= 50)
+        281(0.57) 120(0.22) *67(0.78)
+        var%=[0.48, 0.43, 0.37, 0.37, 0.35, 0.35, 0.33]
+
+[compare] IBD partitions: adjusted Rand index (full partition) / Jaccard of the KEPT set
+  AFR: louv/spec  0.89/0.92   louv/dbsc  0.85/0.89   spec/dbsc  0.81/0.84
+  EAS: louv/spec  0.81/0.07   louv/dbsc  0.21/0.34   spec/dbsc  0.21/0.33
+  EUR: louv/spec  0.56/0.72   louv/dbsc  0.49/0.68   spec/dbsc  0.90/0.93
+  SAS: louv/spec  0.47/0.62   louv/dbsc  0.18/0.57   spec/dbsc  0.13/0.40
+
+[truth] agreement with reported 1000G subpopulations (ARI / AMI)
+  pop  #sub |       louvain      spectral        dbscan    snp-kmeans
+  AFR     7 |     0.49/0.74     0.45/0.75     0.54/0.76     0.59/0.76
+  EAS     5 |     0.67/0.75     0.71/0.78     0.19/0.42     0.59/0.70
+  EUR     5 |     0.23/0.50     0.49/0.71     0.49/0.68     0.78/0.88
+  SAS     5 |     0.36/0.55     0.45/0.58     0.02/0.15     0.30/0.44
+[save] clustering/highcov_ibd.txt  (379 individuals; AFR/EAS/EUR/SAS = 99/93/100/87)
+[save] clustering/highcov_snp.txt  (379 individuals; AFR/EAS/EUR/SAS = 99/104/109/67)
+[save] clustering/highcov_ibd_louvain.txt  (369 individuals; AFR/EAS/EUR/SAS = 99/93/99/78)
+[save] clustering/highcov_ibd_spectral.txt  (379 individuals; AFR/EAS/EUR/SAS = 99/93/100/87)
+[save] clustering/highcov_ibd_dbscan.txt  (729 individuals; AFR/EAS/EUR/SAS = 99/91/99/440)
+[save] clustering/highcov_clusters.png
+[save] clustering/highcov_summary.json

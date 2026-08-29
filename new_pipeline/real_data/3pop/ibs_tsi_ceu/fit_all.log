@@ -1,0 +1,83 @@
+[3pop] 21 topologies on ['IBS', 'TSI', 'CEU']
+
+[01/21] ((CEU,IBS),TSI)
+12:41:49 - cmdstanpy - INFO - Chain [1] start processing
+12:41:58 - cmdstanpy - INFO - Chain [1] done processing
+      seed 1: ELBO    -1922.3  logZ    -1917.1  ESS    14.5/4000  10s
+12:41:58 - cmdstanpy - INFO - Chain [1] start processing
+12:42:08 - cmdstanpy - INFO - Chain [1] done processing
+      seed 7: ELBO    -1920.2  logZ    -1917.2  ESS    18.8/4000  10s
+12:42:08 - cmdstanpy - INFO - Chain [1] start processing
+12:42:17 - cmdstanpy - INFO - Chain [1] done processing
+      seed 13: ELBO    -1920.6  logZ    -1917.3  ESS    51.3/4000  10s
+12:42:17 - cmdstanpy - INFO - Chain [1] start processing
+12:42:27 - cmdstanpy - INFO - Chain [1] done processing
+      seed 23: ELBO    -1920.8  logZ    -1916.1  ESS     1.5/4000  10s
+12:42:27 - cmdstanpy - INFO - Chain [1] start processing
+12:42:36 - cmdstanpy - INFO - Chain [1] done processing
+      seed 31: ELBO    -1920.1  logZ    -1917.5  ESS    28.9/4000  10s
+12:42:37 - cmdstanpy - INFO - Chain [1] start processing
+12:42:46 - cmdstanpy - INFO - Chain [1] done processing
+      seed 47: ELBO    -1920.4  logZ    -1915.2  ESS     2.1/4000  10s
+[02/21] ((CEU,TSI),IBS)
+12:42:48 - cmdstanpy - INFO - Chain [1] start processing
+12:43:00 - cmdstanpy - INFO - Chain [1] done processing
+      seed 1: ELBO    -2916.3  logZ    -2913.6  ESS    15.4/4000  12s
+12:43:01 - cmdstanpy - INFO - Chain [1] start processing
+12:43:13 - cmdstanpy - INFO - Chain [1] done processing
+      seed 7: ELBO    -2916.6  logZ    -2913.1  ESS    18.5/4000  12s
+12:43:13 - cmdstanpy - INFO - Chain [1] start processing
+12:43:25 - cmdstanpy - INFO - Chain [1] done processing
+      seed 13: ELBO    -2917.2  logZ    -2913.1  ESS     5.7/4000  12s
+12:43:25 - cmdstanpy - INFO - Chain [1] start processing
+12:43:37 - cmdstanpy - INFO - Chain [1] done processing
+      seed 23: ELBO    -2917.2  logZ    -2912.2  ESS     1.9/4000  12s
+12:43:37 - cmdstanpy - INFO - Chain [1] start processing
+12:43:49 - cmdstanpy - INFO - Chain [1] done processing
+      seed 31: ELBO    -2916.6  logZ    -2913.5  ESS    20.9/4000  12s
+12:43:50 - cmdstanpy - INFO - Chain [1] start processing
+12:44:02 - cmdstanpy - INFO - Chain [1] done processing
+      seed 47: ELBO    -2916.7  logZ    -2913.3  ESS    16.5/4000  13s
+[03/21] ((IBS,TSI),CEU)
+12:44:03 - cmdstanpy - INFO - Chain [1] start processing
+12:44:13 - cmdstanpy - INFO - Chain [1] done processing
+      seed 1: ELBO    -2820.8  logZ    -2816.4  ESS    17.5/4000  10s
+12:44:13 - cmdstanpy - INFO - Chain [1] start processing
+12:44:23 - cmdstanpy - INFO - Chain [1] done processing
+      seed 7: ELBO    -2820.5  logZ    -2815.2  ESS     5.7/4000  10s
+12:44:24 - cmdstanpy - INFO - Chain [1] start processing
+12:44:34 - cmdstanpy - INFO - Chain [1] done processing
+      seed 13: ELBO    -2820.5  logZ    -2813.7  ESS     1.1/4000  10s
+12:44:34 - cmdstanpy - INFO - Chain [1] start processing
+12:44:44 - cmdstanpy - INFO - Chain [1] done processing
+      seed 23: ELBO    -2821.0  logZ    -2814.9  ESS     1.4/4000  10s
+12:44:44 - cmdstanpy - INFO - Chain [1] start processing
+12:44:54 - cmdstanpy - INFO - Chain [1] done processing
+      seed 31: ELBO    -2820.5  logZ    -2817.1  ESS    48.2/4000  10s
+12:44:54 - cmdstanpy - INFO - Chain [1] start processing
+12:45:04 - cmdstanpy - INFO - Chain [1] done processing
+      seed 47: ELBO    -2822.7  logZ    -2816.4  ESS     7.8/4000  10s
+[04/21] (((CEU,IBS.1),IBS.2),TSI)
+12:45:06 - cmdstanpy - INFO - Chain [1] start processing
+12:45:27 - cmdstanpy - INFO - Chain [1] done processing
+      seed 1: ELBO     -575.0  logZ     -567.2  ESS    22.1/4000  22s
+12:45:27 - cmdstanpy - INFO - Chain [1] start processing
+12:45:49 - cmdstanpy - INFO - Chain [1] done processing
+      seed 7: ELBO     -575.6  logZ     -562.3  ESS     1.1/4000  22s
+12:45:49 - cmdstanpy - INFO - Chain [1] start processing
+12:46:10 - cmdstanpy - INFO - Chain [1] done processing
+      seed 13: ELBO     -575.6  logZ     -563.4  ESS     1.3/4000  22s
+12:46:11 - cmdstanpy - INFO - Chain [1] start processing
+12:46:32 - cmdstanpy - INFO - Chain [1] done processing
+      seed 23: ELBO     -575.8  logZ     -566.6  ESS     9.2/4000  22s
+12:46:33 - cmdstanpy - INFO - Chain [1] start processing
+12:46:54 - cmdstanpy - INFO - Chain [1] done processing
+      seed 31: ELBO     -575.0  logZ     -565.7  ESS     4.2/4000  22s
+12:46:55 - cmdstanpy - INFO - Chain [1] start processing
+12:47:16 - cmdstanpy - INFO - Chain [1] done processing
+      seed 47: ELBO     -574.9  logZ     -566.1  ESS     3.3/4000  22s
+[05/21] (((CEU,IBS.1),TSI),IBS.2)
+12:47:17 - cmdstanpy - INFO - Chain [1] start processing
+12:47:41 - cmdstanpy - INFO - Chain [1] done processing
+      seed 1: ELBO     -476.7  logZ     -464.2  ESS     3.6/4000  23s
+12:47:41 - cmdstanpy - INFO - Chain [1] start processing

@@ -1,0 +1,274 @@
+[
+  {
+    "route": "SNP kmeans",
+    "pop": "AFR",
+    "n": 99,
+    "subpop": "LWK",
+    "purity": 1.0,
+    "recall": 1.0,
+    "jaccard": 1.0,
+    "composition": {
+      "LWK": [
+        99,
+        99
+      ]
+    }
+  },
+  {
+    "route": "SNP kmeans",
+    "pop": "EAS",
+    "n": 104,
+    "subpop": "JPT",
+    "purity": 1.0,
+    "recall": 1.0,
+    "jaccard": 1.0,
+    "composition": {
+      "JPT": [
+        104,
+        104
+      ]
+    }
+  },
+  {
+    "route": "SNP kmeans",
+    "pop": "EUR",
+    "n": 109,
+    "subpop": "TSI",
+    "purity": 0.9725,
+    "recall": 0.9907,
+    "jaccard": 0.9636,
+    "composition": {
+      "TSI": [
+        106,
+        107
+      ],
+      "IBS": [
+        3,
+        107
+      ]
+    }
+  },
+  {
+    "route": "SNP kmeans",
+    "pop": "SAS",
+    "n": 67,
+    "subpop": "GIH",
+    "purity": 1.0,
+    "recall": 0.6505,
+    "jaccard": 0.6505,
+    "composition": {
+      "GIH": [
+        67,
+        103
+      ]
+    }
+  },
+  {
+    "route": "IBD louvain",
+    "pop": "AFR",
+    "n": 99,
+    "subpop": "LWK",
+    "purity": 1.0,
+    "recall": 1.0,
+    "jaccard": 1.0,
+    "composition": {
+      "LWK": [
+        99,
+        99
+      ]
+    }
+  },
+  {
+    "route": "IBD louvain",
+    "pop": "EAS",
+    "n": 93,
+    "subpop": "CDX",
+    "purity": 0.9892,
+    "recall": 0.9892,
+    "jaccard": 0.9787,
+    "composition": {
+      "CDX": [
+        92,
+        93
+      ],
+      "CHB": [
+        1,
+        103
+      ]
+    }
+  },
+  {
+    "route": "IBD louvain",
+    "pop": "EUR",
+    "n": 99,
+    "subpop": "FIN",
+    "purity": 1.0,
+    "recall": 1.0,
+    "jaccard": 1.0,
+    "composition": {
+      "FIN": [
+        99,
+        99
+      ]
+    }
+  },
+  {
+    "route": "IBD louvain",
+    "pop": "SAS",
+    "n": 78,
+    "subpop": "GIH",
+    "purity": 1.0,
+    "recall": 0.7573,
+    "jaccard": 0.7573,
+    "composition": {
+      "GIH": [
+        78,
+        103
+      ]
+    }
+  },
+  {
+    "route": "IBD spectral",
+    "pop": "AFR",
+    "n": 99,
+    "subpop": "LWK",
+    "purity": 1.0,
+    "recall": 1.0,
+    "jaccard": 1.0,
+    "composition": {
+      "LWK": [
+        99,
+        99
+      ]
+    }
+  },
+  {
+    "route": "IBD spectral",
+    "pop": "EAS",
+    "n": 93,
+    "subpop": "CDX",
+    "purity": 0.9892,
+    "recall": 0.9892,
+    "jaccard": 0.9787,
+    "composition": {
+      "CDX": [
+        92,
+        93
+      ],
+      "CHB": [
+        1,
+        103
+      ]
+    }
+  },
+  {
+    "route": "IBD spectral",
+    "pop": "EUR",
+    "n": 100,
+    "subpop": "FIN",
+    "purity": 0.99,
+    "recall": 1.0,
+    "jaccard": 0.99,
+    "composition": {
+      "FIN": [
+        99,
+        99
+      ],
+      "CEU": [
+        1,
+        99
+      ]
+    }
+  },
+  {
+    "route": "IBD spectral",
+    "pop": "SAS",
+    "n": 87,
+    "subpop": "GIH",
+    "purity": 1.0,
+    "recall": 0.8447,
+    "jaccard": 0.8447,
+    "composition": {
+      "GIH": [
+        87,
+        103
+      ]
+    }
+  },
+  {
+    "route": "IBD dbscan",
+    "pop": "AFR",
+    "n": 99,
+    "subpop": "LWK",
+    "purity": 1.0,
+    "recall": 1.0,
+    "jaccard": 1.0,
+    "composition": {
+      "LWK": [
+        99,
+        99
+      ]
+    }
+  },
+  {
+    "route": "IBD dbscan",
+    "pop": "EAS",
+    "n": 91,
+    "subpop": "CDX",
+    "purity": 1.0,
+    "recall": 0.9785,
+    "jaccard": 0.9785,
+    "composition": {
+      "CDX": [
+        91,
+        93
+      ]
+    }
+  },
+  {
+    "route": "IBD dbscan",
+    "pop": "EUR",
+    "n": 99,
+    "subpop": "FIN",
+    "purity": 1.0,
+    "recall": 1.0,
+    "jaccard": 1.0,
+    "composition": {
+      "FIN": [
+        99,
+        99
+      ]
+    }
+  },
+  {
+    "route": "IBD dbscan",
+    "pop": "SAS",
+    "n": 440,
+    "subpop": "STU",
+    "purity": 0.2318,
+    "recall": 1.0,
+    "jaccard": 0.2318,
+    "composition": {
+      "STU": [
+        102,
+        102
+      ],
+      "ITU": [
+        100,
+        102
+      ],
+      "GIH": [
+        93,
+        103
+      ],
+      "BEB": [
+        85,
+        86
+      ],
+      "PJL": [
+        60,
+        96
+      ]
+    }
+  }
+]
