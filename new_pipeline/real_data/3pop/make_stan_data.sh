@@ -27,13 +27,21 @@ if [ "$#" -ne 4 ]; then
     exit 2
 fi
 TAG=$1; P1=$2; P2=$3; P3=$4
-PY=/opt/miniconda3/envs/genetics_env/bin/python
+PY=${PYTHON:-/opt/anaconda3/envs/stan_env/bin/python}
+HIGH_COV_DIR=${HIGH_COV_DIR:-high_cov}
 DIR=3pop/$TAG
 mkdir -p "$DIR/stan_data"
 
 LAB=$DIR/labels_$TAG.txt
-awk -v a="$P1" -v b="$P2" -v c="$P3" '$2==a||$2==b||$2==c' \
-    high_cov/samples/labels_subpop.txt > "$LAB"
+# Subpopulation labels are preferred.  If a requested name is instead a
+# superpopulation (for example EAS), supplement it from the simple labels.
+awk -v a="$P1" -v b="$P2" -v c="$P3" \
+    '$2==a||$2==b||$2==c {print $1, $2}' \
+    "$HIGH_COV_DIR/samples/labels_subpop.txt" > "$LAB"
+awk -v a="$P1" -v b="$P2" -v c="$P3" \
+    'BEGIN {OFS=" "} $2==a||$2==b||$2==c {id=$1; sub(/_.*/, "", id); print id, $2}' \
+    merged_pruned/population_labels_simple.txt >> "$LAB"
+sort -u "$LAB" -o "$LAB"
 echo "[labels] $LAB"
 awk '{print $2}' "$LAB" | sort | uniq -c
 
@@ -41,9 +49,9 @@ $PY generate_stan_data.py \
     --labels    "$LAB" \
     --pop-order "$P1" "$P2" "$P3" \
     --ibd-method file \
-    --ibd-glob  'high_cov/ibd_all_masked.ibd.gz' \
+    --ibd-glob  "$HIGH_COV_DIR/ibd_all_masked.ibd.gz" \
     --vcf-glob  'merged_pruned/vcf/merged_all.chr[!9]*_pruned.vcf.gz' \
-    --genmap-dir high_cov/genmap \
+    --genmap-dir "$HIGH_COV_DIR/genmap" \
     --mask-regions high_cov/bad_regions_grch38.bed \
     --bins-uniform 2.0 20.5 0.5 \
     --min-maf 0.05 \

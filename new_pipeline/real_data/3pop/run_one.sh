@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end sweep for one leaf set: Stan inputs -> 21 topology fits -> ranking.
+# End-to-end sweep: Stan inputs -> 21 topologies x four models -> comparison.
 #
 #   usage:  run_one.sh <tag> <POP1> <POP2> <POP3> [seeds...]
 #   e.g.    run_one.sh gbr_ceu_ibs GBR CEU IBS
@@ -19,7 +19,7 @@ if [ "$#" -lt 4 ]; then
 fi
 TAG=$1; P1=$2; P2=$3; P3=$4; shift 4
 SEEDS=${*:-"1 7 13 23 31 47"}
-PY=/opt/miniconda3/envs/genetics_env/bin/python
+PY=${PYTHON:-/opt/anaconda3/envs/stan_env/bin/python}
 
 if [ ! -f "$TAG/stan_data/stan_$TAG.npz" ]; then
     bash make_stan_data.sh "$TAG" "$P1" "$P2" "$P3"
@@ -27,6 +27,7 @@ else
     echo "[skip] $TAG/stan_data/stan_$TAG.npz already exists"
 fi
 
-$PY fit_topologies.py --tag "$TAG" --pops "$P1" "$P2" "$P3" --seeds $SEEDS \
-    2>&1 | tee "$TAG/fit_all.log"
-$PY compare_elbo.py --tag "$TAG" 2>&1 | tee "$TAG/comparison/ranking.txt"
+$PY fit_four_models.py --tag "$TAG" --pops "$P1" "$P2" "$P3" --seeds $SEEDS \
+    2>&1 | tee "$TAG/fit_four_models.log"
+$PY compare_four_models.py --tag "$TAG" \
+    2>&1 | tee "$TAG/comparison/compare_four_models.log"
