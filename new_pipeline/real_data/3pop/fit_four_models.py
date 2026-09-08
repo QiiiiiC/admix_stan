@@ -59,7 +59,7 @@ not constant" at least as much as for "one leaf is admixed", and the two cannot
 be separated on three leaves.  The spectrum residual plots are in each folder
 for precisely this reason: look at whether the win came from removing a tilt.
 """
-import os, sys, io, json, time, glob, argparse, contextlib, tempfile
+import os, sys, io, json, time, glob, argparse, contextlib, tempfile, logging
 import numpy as np
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -68,6 +68,7 @@ sys.path.insert(0, _RD)
 sys.path.insert(0, _HERE)
 
 from cmdstanpy import CmdStanModel                  # noqa: E402
+logging.getLogger("cmdstanpy").setLevel(logging.ERROR)
 import infer_topology as IT                        # noqa: E402
 import enumerate_3pop as ET                  # noqa: E402
 
@@ -85,9 +86,14 @@ ap.add_argument("--pops", nargs=3, required=True,
                      "matrix rows are indexed by that pop_order.")
 ap.add_argument("--prefix", default=None,
                 help="Stan input prefix (default 3pop/<tag>/stan_data/stan_<tag>).")
-ap.add_argument("--seeds", nargs="+", type=int, default=[1, 7, 13],
-                help="Pathfinder is mode-seeking; restarts guard against a bad "
-                     "L-BFGS path. The best ELBO over seeds is kept.")
+ap.add_argument("--search-seed", type=int, default=20260903,
+                help="Seed for reproducible generation of dispersed initial values.")
+ap.add_argument("--map-starts", type=int, default=12,
+                help="Number of genuinely different MAP screening starts per topology.")
+ap.add_argument("--pathfinder-modes", type=int, default=3,
+                help="Number of distinct MAP modes promoted to Pathfinder.")
+ap.add_argument("--map-iter", type=int, default=1200,
+                help="Maximum LBFGS iterations for each MAP screening run.")
 ap.add_argument("--draws", type=int, default=4000)
 ap.add_argument("--paths", type=int, default=8)
 ap.add_argument("--variants", nargs="+", default=None,
@@ -370,6 +376,7 @@ if unknown:
 for key in variant_keys:
     SPECS[key]["key"] = key
     SPECS[key]["model"] = CmdStanModel(stan_file=find_model(SPECS[key]["stan"]))
+logging.getLogger("cmdstanpy").setLevel(logging.ERROR)
 
 MODELS = ET.enumerate_all(POPS)
 if a.only:
@@ -402,6 +409,106 @@ def quiet(fn, *args, **kw):
         return fn(*args, **kw)
 
 
+FRACTION_STARTS = (0.001, 0.01, 0.1, 0.5, 0.9, 0.99, 0.999)
+TIME_SCALES = (5.0, 20.0, 75.0, 250.0, 750.0)
+NE_LEVELS = (3000.0, 15000.0, 100000.0, 500000.0)
+RW_SCALES = (0.15, 0.3, 0.6, 1.0)
+
+
+def dispersed_init(spec, n_events, n_admixture, n_nodes, n_leaves,
+                   start_index, rng):
+    """Generate model-independent starts spanning boundaries and time scales."""
+    if start_index == 0:
+        times = np.full(n_events, 100.0)
+        fractions = np.full(n_admixture, 0.5)
+        level = 15000.0
+        sigma = tau = 0.3
+        raw_scale = 0.0
+    else:
+        scale = TIME_SCALES[(start_index - 1) % len(TIME_SCALES)]
+        times = scale * np.exp(rng.normal(0.0, 0.28, n_events))
+        times = np.maximum(times, 1.01)
+        fraction = FRACTION_STARTS[(start_index - 1) % len(FRACTION_STARTS)]
+        fractions = np.full(n_admixture, fraction)
+        level = NE_LEVELS[(start_index - 1) % len(NE_LEVELS)]
+        sigma = RW_SCALES[(start_index - 1) % len(RW_SCALES)]
+        tau = RW_SCALES[(start_index + 1) % len(RW_SCALES)]
+        raw_scale = 0.65
+
+    init = {"times": times.tolist(),
+            "admixture_fractions": fractions.tolist()}
+    components = ("ibd", "snp") if spec["separate_ne"] else (None,)
+    for component_index, component in enumerate(components):
+        suffix = "" if component is None else f"_{component}"
+        component_level = level
+        if component is not None and start_index > 0:
+            shift = 1 if component == "ibd" else -1
+            component_level = NE_LEVELS[
+                ((start_index - 1) + shift) % len(NE_LEVELS)]
+        init[f"mu_log{suffix}"] = float(np.log(component_level))
+        init[f"sigma_log{suffix}"] = float(sigma)
+        init[f"tau{suffix}"] = float(tau)
+        init[f"Ne_raw{suffix}"] = rng.normal(
+            0.0, raw_scale, n_nodes).clip(-2.0, 2.0).tolist()
+        if spec["grid"]:
+            recent = rng.normal(0.0, raw_scale, (n_leaves, 2))
+            if start_index % 4 == 1:
+                recent += np.array([0.35, 0.65])
+            elif start_index % 4 == 2:
+                recent -= np.array([0.35, 0.65])
+            init[f"Ne_recent_raw{suffix}"] = recent.clip(-2.0, 2.0).tolist()
+    return init
+
+
+def sanitize_init(init):
+    """Move optimized constrained values just inside Stan's open boundaries."""
+    clean = {k: np.asarray(v).copy() for k, v in init.items()}
+    if "times" in clean:
+        clean["times"] = np.maximum(clean["times"], 1.0001)
+    if "admixture_fractions" in clean:
+        clean["admixture_fractions"] = np.atleast_1d(np.clip(
+            clean["admixture_fractions"], 1e-7, 1.0 - 1e-7))
+    for key in clean:
+        if key.startswith("sigma_log") or key.startswith("tau"):
+            clean[key] = np.maximum(clean[key], 1e-7)
+    return {k: (float(v) if v.ndim == 0 else v.tolist()) for k, v in clean.items()}
+
+
+def mode_signature(init):
+    """A scaled parameter signature used to avoid promoting duplicate MAP modes."""
+    values = [np.log(np.asarray(init["times"], float))]
+    fractions = np.atleast_1d(
+        np.asarray(init.get("admixture_fractions", []), float))
+    if fractions.size:
+        fractions = np.clip(fractions, 1e-7, 1 - 1e-7)
+        values.append(np.log(fractions / (1 - fractions)) / 2.0)
+    for key in sorted(init):
+        if key.startswith("mu_log"):
+            values.append(np.atleast_1d(np.asarray(init[key], float) / 2.0))
+        elif key.startswith("tau") or key.startswith("sigma_log"):
+            values.append(np.atleast_1d(np.log(np.asarray(init[key], float))))
+        elif key.startswith("Ne_raw"):
+            values.append(np.asarray(init[key], float).ravel() / 2.0)
+    return np.concatenate(values)
+
+
+def select_distinct_modes(candidates, count, min_distance=0.75):
+    selected = []
+    for candidate in sorted(candidates, key=lambda x: -x["map_lp"]):
+        signature = candidate["signature"]
+        if all(np.linalg.norm(signature - x["signature"]) >= min_distance
+               for x in selected):
+            selected.append(candidate)
+        if len(selected) == count:
+            break
+    if len(selected) < count:
+        used = {x["start_id"] for x in selected}
+        selected.extend(x for x in sorted(candidates, key=lambda x: -x["map_lp"])
+                        if x["start_id"] not in used)
+        selected = selected[:count]
+    return selected
+
+
 # ---------------------------------------------------------------- fitting
 def fit_one(m, spec):
     dem = quiet(ET.make_dem, POPS, m)
@@ -411,38 +518,69 @@ def fit_one(m, spec):
     nodes = list(dem.nodes.keys())
     n_ev, n_ad, n_nd = data["n_events"], data["n_admixture"], data["n_nodes"]
     n_leaves = data["n_leaves"]
-    if spec["separate_ne"]:
-        init = separate_ne_init_from_shared(
-            m, data, n_ev, n_ad, n_nd, n_leaves, spec["likelihood"], spec["grid"])
-        cold_init = None
-    else:
-        if spec["grid"]:
-            init = shared_grid_init_from_base(
-                m, data, n_ev, n_ad, n_nd, n_leaves, spec["likelihood"])
-            cold_init = shared_ne_init(n_ev, n_ad, n_nd, n_leaves, grid=True)
-        else:
-            init = shared_ne_init(n_ev, n_ad, n_nd, n_leaves)
-            cold_init = None
     C = lp_const(n_ev, n_nd, n_leaves, spec["separate_ne"], spec["grid"])
 
+    variant_code = sum((i + 1) * ord(c) for i, c in enumerate(spec["key"]))
+    rng = np.random.default_rng(
+        a.search_seed + 1009 * m["index"] + 9176 * variant_code)
+    map_candidates = []
+    print(f"      MAP screen: {a.map_starts} dispersed starts", flush=True)
+    for start_id in range(a.map_starts):
+        map_dir = os.path.join(WORK, spec["key"],
+                               f"{m['index']:02d}_map{start_id:02d}")
+        os.makedirs(map_dir, exist_ok=True)
+        for path in glob.glob(os.path.join(map_dir, "*")):
+            os.remove(path)
+        init = dispersed_init(spec, n_ev, n_ad, n_nd, n_leaves, start_id, rng)
+        try:
+            mle = spec["model"].optimize(
+                data=data, inits=init,
+                seed=a.search_seed + 10000 * m["index"] + start_id,
+                output_dir=map_dir, algorithm="LBFGS", iter=a.map_iter,
+                jacobian=True, require_converged=False, show_console=False)
+            map_lp = float(mle.optimized_params_dict["lp__"])
+            candidate_init = sanitize_init(mle.create_inits())
+            if not np.isfinite(map_lp):
+                raise ValueError("non-finite MAP objective")
+            map_candidates.append({
+                "start_id": start_id,
+                "map_lp": map_lp,
+                "converged": bool(mle.converged),
+                "init": candidate_init,
+                "pathfinder_init": init,
+                "signature": mode_signature(candidate_init),
+            })
+        except Exception as ex:
+            print(f"        start {start_id:02d}: MAP FAILED "
+                  f"{str(ex).splitlines()[-1][:65]}", flush=True)
+    if not map_candidates:
+        print("      all MAP starts failed", flush=True)
+        return None
+    promoted = select_distinct_modes(
+        map_candidates, min(a.pathfinder_modes, len(map_candidates)))
+    summary = ", ".join(
+        f"start {x['start_id']:02d} lp={x['map_lp']:+.1f}"
+        for x in promoted)
+    print(f"      promoted MAP modes: {summary}", flush=True)
+
     best, runs = None, []
-    for seed_index, seed in enumerate(a.seeds):
-        od = os.path.join(WORK, spec["key"], f"{m['index']:02d}_s{seed}")
+    for mode_index, candidate in enumerate(promoted, 1):
+        seed = a.search_seed + 100000 * m["index"] + mode_index
+        od = os.path.join(WORK, spec["key"],
+                          f"{m['index']:02d}_mode{mode_index:02d}")
         os.makedirs(od, exist_ok=True)
         for f in glob.glob(os.path.join(od, "*")):
             os.remove(f)
         t0 = time.time()
-        run_init = (cold_init if cold_init is not None and
-                    seed_index == len(a.seeds) - 1 else init)
-        if run_init is cold_init and cold_init is not None:
-            print(f"      seed {seed}: prior-center grid start", flush=True)
         try:
             fit = spec["model"].pathfinder(
-                data=data, inits=run_init, seed=seed, output_dir=od,
+                data=data, inits=candidate["pathfinder_init"], seed=seed,
+                output_dir=od,
                 num_paths=a.paths, draws=a.draws, num_single_draws=a.draws // a.paths,
                 psis_resample=False, calculate_lp=True, show_console=False)
         except Exception as ex:
-            print(f"      seed {seed}: FAILED {str(ex).splitlines()[-1][:70]}", flush=True)
+            print(f"      mode {mode_index}: FAILED "
+                  f"{str(ex).splitlines()[-1][:70]}", flush=True)
             continue
         cn = list(fit.column_names)
         A = np.asarray(fit.draws()).reshape(-1, len(cn))
@@ -450,30 +588,33 @@ def fit_one(m, spec):
         ok = np.isfinite(logw)
         logw = logw[ok]
         if logw.size < 10:
-            print(f"      seed {seed}: only {logw.size} finite draws, skipped", flush=True)
+            print(f"      mode {mode_index}: only {logw.size} finite draws, skipped", flush=True)
             continue
         S = logw.size
         elbo = float(logw.mean())
         logz = float(np.logaddexp.reduce(logw) - np.log(S))
+        if elbo < candidate["map_lp"] - 1e6:
+            print(f"      mode {mode_index}: pathological Gaussian approximation "
+                  f"(ELBO {elbo:+.1e}), skipped", flush=True)
+            continue
         wt = np.exp(logw - logw.max()); wt /= wt.sum()
         ess = float(1.0 / np.sum(wt ** 2))
-        r = {"seed": seed, "secs": time.time() - t0,
+        r = {"seed": seed, "mode": mode_index,
+             "map_start": candidate["start_id"], "map_lp": candidate["map_lp"],
+             "map_converged": candidate["converged"], "secs": time.time() - t0,
              "elbo_raw": elbo, "logz_raw": logz,
              "elbo": elbo + C, "logz": logz + C,
              "elbo_se": float(logw.std(ddof=1) / np.sqrt(S)),
              "ess": ess, "n_draws": S, "logw": logw}
         sv = {k: np.asarray(v) for k, v in fit.stan_variables().items()}
         r["sv"] = {k: sv[k][ok] if sv[k].shape[0] == ok.size else sv[k] for k in sv}
-        print(f"      seed {seed}: ELBO {r['elbo']:+10.1f}  logZ {r['logz']:+10.1f}  "
+        print(f"      mode {mode_index} (start {candidate['start_id']:02d}): "
+              f"ELBO {r['elbo']:+10.1f}  logZ {r['logz']:+10.1f}  "
               f"ESS {ess:7.1f}/{S}  {r['secs']:.0f}s", flush=True)
         runs.append(r)
-        # Keep the HIGHEST ELBO across restarts.  Justified, not just optimistic:
+        # Keep the HIGHEST ELBO across promoted modes.  Justified, not just optimistic:
         # ELBO <= log Z always, so the largest one found is the tightest bound.
-        # But it is a MAXIMUM, so it inherits the seed-to-seed spread -- a model
-        # whose L-BFGS paths scatter more gets a higher max for that reason
-        # alone.  Every seed's ELBO and log weights are therefore kept, and
-        # compare_elbo.py bootstraps over seeds as well as draws so the ranking
-        # is judged against that spread rather than in spite of it.
+        # Every promoted mode's ELBO and log weights are retained for auditing.
         if best is None or r["elbo"] > best["elbo"]:
             best = r
     if best is None:
@@ -492,11 +633,17 @@ def fit_one(m, spec):
            "n_admix": m["n_admix"], "admixed": m["admixed"],
            "outside_first_merge_rule": m["outside_first_merge_rule"],
            "nodes": nodes, "n_events": n_ev, "n_nodes": n_nd, "lp_const": float(C),
-           "n_seeds": len(runs),
-           "elbo_by_seed": {str(q["seed"]): q["elbo"] for q in runs},
-           "elbo_seed_min": float(min(q["elbo"] for q in runs)),
-           "elbo_seed_max": float(max(q["elbo"] for q in runs)),
-           "logw_by_seed": {str(q["seed"]): q["logw"].tolist() for q in runs},
+           "search_method": "dispersed MAP screening followed by Pathfinder",
+           "search_seed": a.search_seed,
+           "n_map_starts": a.map_starts,
+           "n_map_success": len(map_candidates),
+           "n_pathfinder_modes": len(runs),
+           "map_screen": [{k: q[k] for k in ("start_id", "map_lp", "converged")}
+                          for q in sorted(map_candidates, key=lambda x: -x["map_lp"])],
+           "elbo_by_mode": {str(q["mode"]): q["elbo"] for q in runs},
+           "elbo_mode_min": float(min(q["elbo"] for q in runs)),
+           "elbo_mode_max": float(max(q["elbo"] for q in runs)),
+           "logw_by_mode": {str(q["mode"]): q["logw"].tolist() for q in runs},
            "events": [dict(e) for e in dem.ordered_events],
            "times": t.mean(0).tolist(),
            "times_sd": t.std(0).tolist(),
@@ -677,7 +824,10 @@ def write_report(r, path):
           f"| ESS of the IS weights | {r['ess']:.1f} / {r['n_draws']} | "
           f"{'ok' if r['ess'] >= 50 else 'LOW -- treat logZ with suspicion'} |",
           f"| Stan dropped-constant correction | {r['lp_const']:+.2f} | already applied |",
-          f"| seed kept / runtime | {r['seed']} | {r['secs']:.0f} s |", ""]
+          f"| mode kept / MAP start / runtime | {r['mode']} / {r['map_start']} | "
+          f"{r['secs']:.0f} s |",
+          f"| mode search | {r['n_map_success']}/{r['n_map_starts']} MAP starts succeeded | "
+          f"{r['n_pathfinder_modes']} distinct modes evaluated |", ""]
 
     L += ["## Events (in temporal order, most recent first)", "",
           "| # | type | detail | time (gen) | cumulative |", "|---|---|---|---|---|"]
@@ -763,14 +913,14 @@ for variant in variant_keys:
         print(f"[{m['index']:02d}/21] {m['newick']}", flush=True)
         r = fit_one(m, spec)
         if r is None:
-            print("      ALL SEEDS FAILED", flush=True)
+            print("      ALL MODES FAILED", flush=True)
             continue
         d = os.path.join(OUT, m["name"], variant)
         os.makedirs(d, exist_ok=True)
         if "ibd_pred" in r:
             fig_spectrum(r, os.path.join(d, "spectrum_fit.png"))
         write_report(r, os.path.join(d, "report.md"))
-        BIG = ("logw", "logw_by_seed")
+        BIG = ("logw", "logw_by_mode")
         with open(os.path.join(d, "fit.json"), "w") as fh:
             json.dump({k: v for k, v in r.items() if k not in BIG}, fh, indent=2)
         results.append(r)
@@ -778,7 +928,7 @@ for variant in variant_keys:
     cmp = os.path.join(OUT, "comparison", variant)
     os.makedirs(cmp, exist_ok=True)
     compact = [{k: v for k, v in r.items()
-                if k not in ("logw", "logw_by_seed", "ibd_hat", "ibd_se")}
+                if k not in ("logw", "logw_by_mode", "ibd_hat", "ibd_se")}
                for r in results]
     all_fits_path = os.path.join(cmp, "all_fits.json")
     if a.only and os.path.exists(all_fits_path):
@@ -794,7 +944,7 @@ for variant in variant_keys:
     if a.only and os.path.exists(logw_path):
         old_weights = np.load(logw_path)
         weights.update({k: old_weights[k] for k in old_weights.files})
-    weights.update({f"{r['index']}_s{s}": np.asarray(v)
-                    for r in results for s, v in r["logw_by_seed"].items()})
+    weights.update({f"{r['index']}_m{mode}": np.asarray(v)
+                    for r in results for mode, v in r["logw_by_mode"].items()})
     np.savez(logw_path, **weights)
     print(f"[done] {len(results)}/{len(MODELS)} fitted for {variant}")

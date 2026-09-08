@@ -8,77 +8,80 @@
 
 | quantity | value | |
 |---|---|---|
-| ELBO | -850.60 | +- 0.36 (MC) |
-| logZ (importance sampling) | -805.38 | |
-| ESS of the IS weights | 1.0 / 4000 | LOW -- treat logZ with suspicion |
+| ELBO | +89.64 | +- 0.35 (MC) |
+| logZ (importance sampling) | +112.47 | |
+| ESS of the IS weights | 10.5 / 4000 | LOW -- treat logZ with suspicion |
 | Stan dropped-constant correction | -40.81 | already applied |
-| seed kept / runtime | 1 | 23 s |
+| mode kept / MAP start / runtime | 1 / 7 | 25 s |
+| mode search | 12/12 MAP starts succeeded | 3 distinct modes evaluated |
 
 ## Events (in temporal order, most recent first)
 
 | # | type | detail | time (gen) | cumulative |
 |---|---|---|---|---|
-| 1 | ADMIXTURE | TSI -> TSI.1 + TSI.2 | 148.1 +- 0.6 | 148.1 |
-| 2 | MERGE | TSI.2 + EAS -> n1 | 5.8 +- 0.1 | 153.9 |
-| 3 | MERGE | TSI.1 + n1 -> n2 | 1.1 +- 0.0 | 155.0 |
-| 4 | MERGE | n2 + IBS -> root | 1.1 +- 0.0 | 156.1 |
+| 1 | ADMIXTURE | TSI -> TSI.1 + TSI.2 | 113.1 +- 0.4 | 113.1 |
+| 2 | MERGE | TSI.2 + EAS -> n1 | 17.8 +- 0.2 | 130.9 |
+| 3 | MERGE | TSI.1 + n1 -> n2 | 15.6 +- 0.3 | 146.5 |
+| 4 | MERGE | n2 + IBS -> root | 1.0 +- 0.0 | 147.6 |
 
 ## Admixture fraction
 
-**f = 0.935 +- 0.002** (fraction from `TSI.1`; 0.065 from `TSI.2`)
+**f = 1.000 +- 0.000** (fraction from `TSI.1`; 0.000 from `TSI.2`)
+
+Collapsed to a tree: one source carries <5% of the ancestry, so this graph is behaving as its no-admixture special case.
 
 ## Recent effective sizes for IBD (haploid)
 
 | population | 0-5 gen | 5-10 gen |
 |---|---:|---:|
-| `EAS` | 4,796,470,688 | 2,615,338,203 |
-| `IBS` | 218,171,465 | 77,041,428 |
-| `TSI` | 3,018,455 | 13,242,864 |
+| `EAS` | 4,291,201 | 3,651,895 |
+| `IBS` | 2,397,862 | 1,664,509 |
+| `TSI` | 1,355,973 | 964,029 |
 
 ## Effective sizes for IBD (haploid)
 
 | node | Ne | sd of log Ne |
 |---|---|---|
-| `EAS` | 1,960,725 | 0.05 |
-| `IBS` | 215,435 | 0.03 |
-| `TSI` | 365,991 | 0.06 |
-| `TSI.1` | 9,964 | 0.04 |
-| `TSI.2` | 15,499,668 | 0.14 |
-| `n1` | 1,800 | 0.05 |
-| `n2` | 5,276 | 0.04 |
-| `root` | 51,929 | 0.02 |
+| `EAS` | 2,546,644 | 0.06 |
+| `IBS` | 211,559 | 0.03 |
+| `TSI` | 393,908 | 0.06 |
+| `TSI.1` | 61,956 | 0.03 |
+| `TSI.2` | 21,946 | 0.02 |
+| `n1` | 23,743 | 0.02 |
+| `n2` | 158,481 | 0.02 |
+| `root` | 74,872 | 0.01 |
 
-log-Ne random-walk step scale tau_ibd = 5.976
+log-Ne random-walk step scale tau_ibd = 2.028
 
 ## Recent effective sizes for SNP (haploid)
 
 | population | 0-5 gen | 5-10 gen |
 |---|---:|---:|
-| `EAS` | 187 | 250 |
-| `IBS` | 54,007 | 68,936 |
-| `TSI` | 223,538,843 | 377,223,006 |
+| `EAS` | 764 | 765 |
+| `IBS` | 91,232 | 94,728 |
+| `TSI` | 125,731 | 124,720 |
 
 ## Effective sizes for SNP (haploid)
 
 | node | Ne | sd of log Ne |
 |---|---|---|
-| `EAS` | 1,066 | 0.01 |
-| `IBS` | 263,350 | 0.06 |
-| `TSI` | 103,585,372 | 0.06 |
-| `TSI.1` | 173,070 | 0.01 |
-| `TSI.2` | 4,101,450 | 0.06 |
-| `n1` | 282,498 | 0.01 |
-| `n2` | 182,377 | 0.01 |
-| `root` | 130,846 | 0.01 |
+| `EAS` | 730 | 0.01 |
+| `IBS` | 96,840 | 0.06 |
+| `TSI` | 123,889 | 0.06 |
+| `TSI.1` | 41,756 | 0.05 |
+| `TSI.2` | 11,258 | 0.02 |
+| `n1` | 11,398 | 0.02 |
+| `n2` | 17,509 | 0.03 |
+| `root` | 17,450 | 0.03 |
 
-log-Ne random-walk step scale tau_snp = 1.685
+log-Ne random-walk step scale tau_snp = 1.025
 
 ## Fit quality by component
 
 | component | log-likelihood | n terms | chi2/n |
 |---|---|---|---|
-| IBD | -321.8 | 222 | 41.43 |
-| SNP | +25.3 | 6 | 6.12 |
+| IBD | +337.5 | 222 | 35.34 |
+| SNP | +36.7 | 6 | 2.29 |
 
 IBD chi2/n uses Palamara model-derived Normal variance; SNP chi2/n uses its block SEs. Values near 1 indicate residuals on the modeled noise scale.
 
@@ -86,8 +89,8 @@ IBD chi2/n uses Palamara model-derived Normal variance; SNP chi2/n uses its bloc
 
 | | EAS | IBS | TSI |
 |---|---|---|---|
-| **EAS** | -0.52 | +0.90 | +0.11 |
-| **IBS** | +0.90 | +1.44 | -3.38 |
-| **TSI** | +0.11 | -3.38 | +2.96 |
+| **EAS** | +0.08 | -0.07 | -0.08 |
+| **IBS** | -0.07 | -0.75 | +0.95 |
+| **TSI** | -0.08 | +0.95 | -0.75 |
 
 ![spectrum](spectrum_fit.png)

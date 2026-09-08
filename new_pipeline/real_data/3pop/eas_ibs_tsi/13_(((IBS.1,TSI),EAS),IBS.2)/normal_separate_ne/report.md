@@ -6,63 +6,62 @@
 
 | quantity | value | |
 |---|---|---|
-| ELBO | -83.94 | +- 0.88 (MC) |
-| logZ (importance sampling) | -32.01 | |
-| ESS of the IS weights | 3.1 / 4000 | LOW -- treat logZ with suspicion |
+| ELBO | +687.02 | +- 0.33 (MC) |
+| logZ (importance sampling) | +708.76 | |
+| ESS of the IS weights | 2.5 / 4000 | LOW -- treat logZ with suspicion |
 | Stan dropped-constant correction | -29.78 | already applied |
-| seed kept / runtime | 7 | 17 s |
+| mode kept / MAP start / runtime | 1 / 6 | 20 s |
+| mode search | 12/12 MAP starts succeeded | 3 distinct modes evaluated |
 
 ## Events (in temporal order, most recent first)
 
 | # | type | detail | time (gen) | cumulative |
 |---|---|---|---|---|
-| 1 | ADMIXTURE | IBS -> IBS.1 + IBS.2 | 87.7 +- 1.2 | 87.7 |
-| 2 | MERGE | IBS.2 + TSI -> n1 | 44.6 +- 0.4 | 132.2 |
-| 3 | MERGE | n1 + EAS -> n2 | 236.9 +- 0.2 | 369.1 |
-| 4 | MERGE | IBS.1 + n2 -> root | 208.6 +- 0.3 | 577.7 |
+| 1 | ADMIXTURE | IBS -> IBS.1 + IBS.2 | 84.2 +- 0.9 | 84.2 |
+| 2 | MERGE | IBS.2 + TSI -> n1 | 33.6 +- 1.1 | 117.8 |
+| 3 | MERGE | n1 + EAS -> n2 | 222.5 +- 1.7 | 340.3 |
+| 4 | MERGE | IBS.1 + n2 -> root | 244.6 +- 2.4 | 584.9 |
 
 ## Admixture fraction
 
-**f = 0.015 +- 0.002** (fraction from `IBS.1`; 0.985 from `IBS.2`)
-
-Collapsed to a tree: one source carries <5% of the ancestry, so this graph is behaving as its no-admixture special case.
+**f = 0.710 +- 0.003** (fraction from `IBS.1`; 0.290 from `IBS.2`)
 
 ## Effective sizes for IBD (haploid)
 
 | node | Ne | sd of log Ne |
 |---|---|---|
-| `EAS` | 976,274 | 0.03 |
-| `IBS` | 835,939 | 0.01 |
-| `TSI` | 403,785 | 0.07 |
-| `IBS.1` | 0 | 0.05 |
-| `IBS.2` | 63,355 | 0.04 |
-| `n1` | 52,685 | 0.04 |
-| `n2` | 3 | 0.01 |
-| `root` | 2,397 | 0.00 |
+| `EAS` | 1,176,875 | 0.01 |
+| `IBS` | 835,858 | 0.03 |
+| `TSI` | 536,134 | 0.05 |
+| `IBS.1` | 27,396 | 0.04 |
+| `IBS.2` | 22,070 | 0.06 |
+| `n1` | 29,752 | 0.04 |
+| `n2` | 27 | 0.10 |
+| `root` | 6,447 | 0.04 |
 
-log-Ne random-walk step scale tau_ibd = 1.590
+log-Ne random-walk step scale tau_ibd = 1.653
 
 ## Effective sizes for SNP (haploid)
 
 | node | Ne | sd of log Ne |
 |---|---|---|
-| `EAS` | 13,287,218 | 0.03 |
-| `IBS` | 1,096,260 | 0.03 |
-| `TSI` | 9,386,107 | 0.03 |
-| `IBS.1` | 23,864 | 0.01 |
-| `IBS.2` | 11,315 | 0.02 |
-| `n1` | 1,301 | 0.03 |
-| `n2` | 2,058 | 0.02 |
-| `root` | 25,393 | 0.01 |
+| `EAS` | 1,892 | 0.01 |
+| `IBS` | 893,382 | 0.04 |
+| `TSI` | 605,619 | 0.04 |
+| `IBS.1` | 1,007,974 | 0.05 |
+| `IBS.2` | 128,316 | 0.03 |
+| `n1` | 138,583 | 0.02 |
+| `n2` | 84,166 | 0.01 |
+| `root` | 27,491 | 0.02 |
 
-log-Ne random-walk step scale tau_snp = 1.697
+log-Ne random-walk step scale tau_snp = 0.828
 
 ## Fit quality by component
 
 | component | log-likelihood | n terms | chi2/n |
 |---|---|---|---|
-| IBD | +168.6 | 222 | 37.65 |
-| SNP | +11.8 | 6 | 10.59 |
+| IBD | +854.9 | 222 | 31.36 |
+| SNP | +37.4 | 6 | 2.08 |
 
 IBD chi2/n uses Palamara model-derived Normal variance; SNP chi2/n uses its block SEs. Values near 1 indicate residuals on the modeled noise scale.
 
@@ -70,8 +69,8 @@ IBD chi2/n uses Palamara model-derived Normal variance; SNP chi2/n uses its bloc
 
 | | EAS | IBS | TSI |
 |---|---|---|---|
-| **EAS** | +0.34 | -1.00 | +0.34 |
-| **IBS** | -1.00 | -0.16 | +2.21 |
-| **TSI** | +0.34 | +2.21 | -2.72 |
+| **EAS** | -0.02 | +0.16 | -0.12 |
+| **IBS** | +0.16 | -0.46 | +0.16 |
+| **TSI** | -0.12 | +0.16 | +0.08 |
 
 ![spectrum](spectrum_fit.png)

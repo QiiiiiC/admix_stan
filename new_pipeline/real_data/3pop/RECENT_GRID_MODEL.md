@@ -62,10 +62,12 @@ Run all four grid variants over all 21 topologies with:
   --tag eas_ibs_tsi --pops EAS IBS TSI \
   --variants poisson_grid_shared_ne normal_grid_shared_ne \
              poisson_grid_separate_ne normal_grid_separate_ne \
-  --seeds 1 7 13 --draws 4000 --paths 8
+  --map-starts 12 --pathfinder-modes 3 --map-iter 1200 \
+  --draws 4000 --paths 8
 ```
 
 All 21 topologies in `eas_ibs_tsi` were fitted for all four grid variants with
-three seeds, 4,000 draws, and eight Pathfinder paths. The combined outputs are
+12 dispersed MAP starts, three promoted modes, 4,000 draws, and eight
+Pathfinder paths. The combined outputs are
 in `eas_ibs_tsi/comparison/report.md` and
 `eas_ibs_tsi/comparison/eight_model_topology_table.csv`.

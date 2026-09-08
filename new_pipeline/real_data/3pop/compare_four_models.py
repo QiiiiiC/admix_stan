@@ -21,6 +21,7 @@ VARIANTS = [
     "normal_grid_shared_ne",
     "normal_grid_separate_ne",
 ]
+SIMPLE_VARIANTS = VARIANTS[:4]
 
 LABELS = {
     "poisson_shared_ne": "Poisson, shared Ne",
@@ -38,6 +39,53 @@ def softmax(x):
     z = np.asarray(x, float) - np.max(x)
     w = np.exp(z)
     return w / w.sum()
+
+
+def admixture_fraction(row):
+    fractions = row.get("admixture_fractions", [])
+    return float(fractions[0]) if fractions else None
+
+
+def format_fraction(row, digits=3):
+    fraction = admixture_fraction(row)
+    return "-" if fraction is None else f"{fraction:.{digits}f}"
+
+
+def closest_non_admix_tree(row, pops, all_rows, threshold=0.01):
+    """Collapse a boundary admixture edge and identify its displayed tree."""
+    fraction = admixture_fraction(row)
+    if fraction is None or min(fraction, 1.0 - fraction) >= threshold:
+        return None
+
+    tree_by_sisters = {}
+    for candidate in all_rows:
+        if candidate["n_admix"] != 0:
+            continue
+        first_merge = next(e for e in candidate["events"] if e["type"] == "MERGE")
+        tree_by_sisters[frozenset(first_merge["children"])] = candidate
+
+    admixture = next(e for e in row["events"] if e["type"] == "ADMIXTURE")
+    retained = admixture["parents"][0 if fraction > 0.5 else 1]
+    states = {pop: {pop} for pop in pops}
+    states[admixture["child"]] = set()
+    for parent in admixture["parents"]:
+        states[parent] = {admixture["child"]} if parent == retained else set()
+
+    for event in row["events"]:
+        if event["type"] != "MERGE":
+            continue
+        left = states.get(event["children"][0], set())
+        right = states.get(event["children"][1], set())
+        merged = left | right
+        states[event["parent"]] = merged
+        if left and right and len(merged) == 2:
+            return tree_by_sisters.get(frozenset(merged))
+    return None
+
+
+def format_closest_tree(row, pops, all_rows):
+    tree = closest_non_admix_tree(row, pops, all_rows)
+    return "-" if tree is None else f"[{tree['index']:02d}] {tree['newick']}"
 
 
 def load_variant(root, key):
@@ -58,12 +106,15 @@ def write_variant_outputs(root, key, pops, rows):
     out = os.path.join(root, "comparison", key)
     os.makedirs(out, exist_ok=True)
     txt = [f"TOPOLOGY RANKING: {LABELS[key]} | {'/'.join(pops)}", ""]
-    txt.append(f"{'rank':>4} {'idx':>3} {'topology':<35} {'ELBO':>12} "
+    txt.append(f"{'rank':>4} {'idx':>3} {'topology':<35} {'f':>8} "
+               f"{'closest tree when boundary':<25} {'ELBO':>12} "
                f"{'dELBO':>10} {'ELBO-w':>8} {'X2 IBD':>9} {'X2 SNP':>9}")
     for r in rows:
         ci = r["chi2_ibd"] / max(r.get("n_ibd_obs", 1), 1)
         cs = r["chi2_snp"] / max(r.get("n_snp_obs", 1), 1)
         txt.append(f"{r['rank']:>4} {r['index']:>3} {r['newick']:<35} "
+                   f"{format_fraction(r, 5):>8} "
+                   f"{format_closest_tree(r, pops, rows):<25} "
                    f"{r['elbo']:>12.2f} {r['d_elbo']:>10.2f} "
                    f"{r['p_model']:>8.4f} {ci:>9.2f} {cs:>9.2f}")
     with open(os.path.join(out, "ranking.txt"), "w") as fh:
@@ -71,41 +122,71 @@ def write_variant_outputs(root, key, pops, rows):
 
     with open(os.path.join(out, "elbo_table.csv"), "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["rank", "index", "newick", "n_admix", "elbo", "d_elbo",
+        w.writerow(["rank", "index", "newick", "n_admix", "admixture_fraction",
+                    "closest_tree_index", "closest_tree_newick",
+                    "elbo", "d_elbo",
                     "elbo_softmax_weight", "elbo_se", "ess", "chi2_ibd_per_n",
-                    "chi2_snp_per_n", "seed", "secs"])
+                    "chi2_snp_per_n", "mode", "map_start", "map_lp",
+                    "n_map_success", "n_pathfinder_modes", "elbo_mode_range",
+                    "seed", "secs"])
         for r in rows:
+            closest = closest_non_admix_tree(r, pops, rows)
             w.writerow([
                 r["rank"], r["index"], r["newick"], r["n_admix"],
+                "" if admixture_fraction(r) is None else f"{admixture_fraction(r):.8f}",
+                "" if closest is None else closest["index"],
+                "" if closest is None else closest["newick"],
                 f"{r['elbo']:.6f}", f"{r['d_elbo']:.6f}",
                 f"{r['p_model']:.8g}", f"{r['elbo_se']:.6f}",
                 f"{r['ess']:.3f}",
                 f"{r['chi2_ibd']/max(r.get('n_ibd_obs',1),1):.6f}",
                 f"{r['chi2_snp']/max(r.get('n_snp_obs',1),1):.6f}",
+                r.get("mode", ""), r.get("map_start", ""),
+                "" if "map_lp" not in r else f"{r['map_lp']:.6f}",
+                r.get("n_map_success", ""), r.get("n_pathfinder_modes", ""),
+                "" if "elbo_mode_min" not in r else
+                f"{r['elbo_mode_max'] - r['elbo_mode_min']:.6f}",
                 r["seed"], f"{r['secs']:.1f}",
             ])
 
     y = np.arange(len(rows))[::-1]
     colors = ["#2f6f9f" if r["n_admix"] == 0 else "#b5483f" for r in rows]
-    fig, ax = plt.subplots(figsize=(11, 7.5))
+    fig, ax = plt.subplots(figsize=(17, 7.5))
     ax.barh(y, [r["d_elbo"] for r in rows], color=colors)
     ax.set_yticks(y)
     ax.set_yticklabels([f"[{r['index']:02d}] {r['newick']}" for r in rows], fontsize=8)
+    for yi, r in zip(y, rows):
+        ax.text(1.015, yi, format_fraction(r, 5), transform=ax.get_yaxis_transform(),
+                ha="left", va="center", fontsize=8, family="monospace")
+        ax.text(1.11, yi, format_closest_tree(r, pops, rows),
+                transform=ax.get_yaxis_transform(), ha="left", va="center", fontsize=8)
+    ax.text(1.015, 1.012, "f", transform=ax.transAxes, ha="left", va="bottom",
+            fontsize=9, fontweight="bold")
+    ax.text(1.11, 1.012, "closest non-admix tree", transform=ax.transAxes,
+            ha="left", va="bottom", fontsize=9, fontweight="bold")
     ax.axvline(0, color="black", lw=.8)
-    ax.set_xlabel("ELBO - best within variant (nats)")
+    ax.set_xlabel("ELBO - best within model (nats; natural-log units, 0 = best)")
     ax.set_title(f"{LABELS[key]} | {' / '.join(pops)}")
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0, 0.72, 1))
     fig.savefig(os.path.join(out, "elbo_ranking.png"), dpi=140)
     plt.close(fig)
 
     report = [f"# {LABELS[key]} topology ranking", "",
               f"Populations: **{' / '.join(pops)}**", "",
               "The weight is a softmax of Pathfinder ELBOs, not a posterior model probability.",
-              "", "| rank | topology | ELBO | dELBO | ELBO weight |",
-              "|---|---|---:|---:|---:|"]
+              "Each topology is screened from dispersed MAP starts; distinct high-MAP modes "
+              "are then fitted independently with Pathfinder. Search diagnostics are retained "
+              "in `fit.json` and `elbo_table.csv`.",
+              "`f` is the fitted ancestry fraction from the first named source branch; "
+              "tree topologies have no fraction. The closest tree is shown when "
+              "`min(f, 1-f) < 0.01`.", "",
+              "| rank | topology | f | closest non-admix tree | ELBO | dELBO | ELBO weight |",
+              "|---|---|---:|---|---:|---:|---:|"]
     for r in rows:
         link = f"../../{r['name']}/{key}/report.md"
-        report.append(f"| {r['rank']} | [`{r['newick']}`]({link}) | "
+        closest = format_closest_tree(r, pops, rows)
+        report.append(f"| {r['rank']} | [`{r['newick']}`]({link}) | {format_fraction(r, 5)} | "
+                      f"`{closest}` | "
                       f"{r['elbo']:+.1f} | {r['d_elbo']:+.1f} | {r['p_model']:.4f} |")
     report += ["", "![ranking](elbo_ranking.png)", ""]
     with open(os.path.join(out, "report.md"), "w") as fh:
@@ -115,13 +196,16 @@ def write_variant_outputs(root, key, pops, rows):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", required=True)
+    ap.add_argument("--simple-only", action="store_true",
+                    help="Regenerate only the four completed non-grid variants.")
     args = ap.parse_args()
     here = os.path.dirname(os.path.abspath(__file__))
     root = os.path.join(here, args.tag)
 
     by_variant = {}
     pops = None
-    for key in VARIANTS:
+    variants = SIMPLE_VARIANTS if args.simple_only else VARIANTS
+    for key in variants:
         p, rows = load_variant(root, key)
         if pops is None:
             pops = p
@@ -135,19 +219,106 @@ def main():
     indices = sorted(set.intersection(*(set(v) for v in by_index.values())))
     comparison = os.path.join(root, "comparison")
 
+    if args.simple_only:
+        with open(os.path.join(comparison, "four_model_topology_table.csv"),
+                  "w", newline="") as fh:
+            w = csv.writer(fh)
+            header = ["index", "newick"]
+            for key in variants:
+                header += [f"rank_{key}", f"f_{key}",
+                           f"closest_tree_{key}", f"elbo_{key}",
+                           f"d_elbo_{key}"]
+            w.writerow(header)
+            for idx in indices:
+                base = by_index[variants[0]][idx]
+                row = [idx, base["newick"]]
+                for key in variants:
+                    r = by_index[key][idx]
+                    fraction = admixture_fraction(r)
+                    closest = closest_non_admix_tree(r, pops, by_variant[key])
+                    row += [r["rank"],
+                            "" if fraction is None else f"{fraction:.8f}",
+                            "" if closest is None else closest["newick"],
+                            f"{r['elbo']:.6f}", f"{r['d_elbo']:.6f}"]
+                w.writerow(row)
+
+        x = np.arange(len(indices))
+        fig, axes = plt.subplots(1, 2, figsize=(15, 5), sharex=True, sharey=True)
+        colors = {"poisson_shared_ne": "#2166ac",
+                  "poisson_separate_ne": "#b2182b",
+                  "normal_shared_ne": "#1b7837",
+                  "normal_separate_ne": "#762a83"}
+        for ax, likelihood in zip(axes, ("poisson", "normal")):
+            for key in [k for k in variants if k.startswith(likelihood)]:
+                ax.plot(x, [by_index[key][i]["rank"] for i in indices], "o-",
+                        ms=4, lw=1.2, color=colors[key], label=LABELS[key])
+            ax.invert_yaxis()
+            ax.set_xticks(x)
+            ax.set_xticklabels([f"{i:02d}" for i in indices])
+            ax.set_xlabel("topology index (categorical, not ELBO)")
+            ax.set_title(f"{likelihood.title()} topology ranks")
+            ax.legend(fontsize=8)
+        axes[0].set_ylabel("rank within model (1 = best)")
+        fig.suptitle(f"Four completed simple-Ne models | {' / '.join(pops)}")
+        fig.tight_layout()
+        fig.savefig(os.path.join(comparison, "four_model_comparison.png"), dpi=140)
+        plt.close(fig)
+
+        report = [f"# Four completed simple-Ne models on {' / '.join(pops)}", "",
+                  "These are the completed multistart reruns. Grid-Ne results are "
+                  "excluded until that batch finishes.", "",
+                  "## Best topology within each model", "",
+                  "| model | winner | ELBO (nats) | runner-up dELBO | mode range | ESS |",
+                  "|---|---|---:|---:|---:|---:|"]
+        for key in variants:
+            rows = by_variant[key]
+            winner = rows[0]
+            mode_range = (winner.get("elbo_mode_max", winner["elbo"])
+                          - winner.get("elbo_mode_min", winner["elbo"]))
+            report.append(f"| {LABELS[key]} | `{winner['newick']}` | "
+                          f"{winner['elbo']:+.1f} | {rows[1]['d_elbo']:+.1f} | "
+                          f"{mode_range:.1f} | {winner['ess']:.1f} |")
+        report += ["", "## Rank consistency", "",
+                   "The horizontal position in the figure is only the topology index. "
+                   "ELBO ranking is on the vertical axis; individual ranking plots use "
+                   "horizontal `ELBO - best` in natural-log units (nats).", "",
+                   "| comparison | Spearman rho | top-5 overlap |",
+                   "|---|---:|---:|"]
+        pairs = [("Poisson shared vs separate", variants[0], variants[1]),
+                 ("Normal shared vs separate", variants[2], variants[3]),
+                 ("Shared Ne: Poisson vs Normal", variants[0], variants[2]),
+                 ("Separate Ne: Poisson vs Normal", variants[1], variants[3])]
+        for label, left, right in pairs:
+            lr = {r["index"]: r["rank"] for r in by_variant[left]}
+            rr = {r["index"]: r["rank"] for r in by_variant[right]}
+            rho = spearmanr([lr[i] for i in indices],
+                            [rr[i] for i in indices]).statistic
+            overlap = len(set(sorted(lr, key=lr.get)[:5]) &
+                          set(sorted(rr, key=rr.get)[:5]))
+            report.append(f"| {label} | {rho:+.3f} | {overlap}/5 |")
+        report += ["", "![four-model comparison](four_model_comparison.png)", ""]
+        with open(os.path.join(comparison, "four_model_report.md"), "w") as fh:
+            fh.write("\n".join(report))
+        return
+
     with open(os.path.join(comparison, "eight_model_topology_table.csv"),
               "w", newline="") as fh:
         w = csv.writer(fh)
         header = ["index", "newick"]
         for key in VARIANTS:
-            header += [f"rank_{key}", f"elbo_{key}", f"d_elbo_{key}"]
+            header += [f"rank_{key}", f"f_{key}", f"closest_tree_{key}",
+                       f"elbo_{key}", f"d_elbo_{key}"]
         w.writerow(header)
         for idx in indices:
             base = by_index[VARIANTS[0]][idx]
             row = [idx, base["newick"]]
             for key in VARIANTS:
                 r = by_index[key][idx]
-                row += [r["rank"], f"{r['elbo']:.6f}", f"{r['d_elbo']:.6f}"]
+                fraction = admixture_fraction(r)
+                closest = closest_non_admix_tree(r, pops, by_variant[key])
+                row += [r["rank"], "" if fraction is None else f"{fraction:.8f}",
+                        "" if closest is None else closest["newick"],
+                        f"{r['elbo']:.6f}", f"{r['d_elbo']:.6f}"]
             w.writerow(row)
 
     fig, ax = plt.subplots(2, 2, figsize=(15, 10), sharex=True)
@@ -325,6 +496,20 @@ def main():
                if normal_floor.size else 0)
     poisson_winner = by_variant["poisson_grid_separate_ne"][0]
     pf = poisson_winner.get("admixture_fractions", [np.nan])[0]
+    winner_lines = []
+    collapsed_indices = []
+    for key in VARIANTS:
+        winner = by_variant[key][0]
+        closest = closest_non_admix_tree(winner, pops, by_variant[key])
+        collapsed_indices.append(None if closest is None else closest["index"])
+        winner_lines.append(
+            f"{LABELS[key]} selects topology {winner['index']} "
+            f"(`{winner['newick']}`), f={format_fraction(winner, 4)}"
+            + (f", collapsing to tree {closest['index']} (`{closest['newick']}`)."
+               if closest is not None else "."))
+    common_collapsed = (collapsed_indices[0] if collapsed_indices and
+                        all(i == collapsed_indices[0] for i in collapsed_indices)
+                        else None)
     report += ["", "## Interpretation", "",
                "Poisson and Normal ELBO levels are not subtracted from each other: the two "
                "likelihoods are densities/masses for different summaries and therefore use "
@@ -342,15 +527,21 @@ def main():
                "should be considered together; a high ELBO for boundary admixture is evidence "
                "for remaining Ne misspecification rather than for gene flow.", "",
                "## Conclusion", "",
-               "All four Poisson variants select topology 15, and all four Normal variants "
-               "select topology 8. The recent grid therefore does not reconcile the two "
-               "likelihoods or change either likelihood's winner.", "",
+               " ".join(winner_lines), "",
+               (f"All eight winners collapse to the same non-admixture topology "
+                f"**{common_collapsed}**. The raw graph labels differ between shared- and "
+                "separate-Ne parameterizations, but their boundary fractions make them "
+                "equivalent at the population-tree level."
+                if common_collapsed is not None else
+                "The winning graphs do not all collapse to one non-admixture topology; "
+                "their fractions and collapsed-tree labels should therefore be compared "
+                "individually."), "",
                f"The grid separate-Ne Poisson winner has IBD chi2/n "
                f"**{poisson_winner['chi2_ibd']/max(poisson_winner.get('n_ibd_obs', 1), 1):.2f}** "
                f"but fraction **{pf:.4f}**. Its good count calibration does not turn that "
                "boundary edge into admixture evidence; the graph is acting as a tree with an "
                "additional branch-specific Ne change.", "",
-               f"The grid separate-Ne Normal winner retains a non-boundary fraction "
+               f"The grid separate-Ne Normal winner has fraction "
                f"**{normal_winner.get('admixture_fractions', [float('nan')])[0]:.4f}**, but its "
                f"IBD chi2/n is **{normal_winner['chi2_ibd']/max(normal_winner.get('n_ibd_obs', 1), 1):.2f}** "
                f"and {n_floor}/{n_unique} cells use the variance floor. Its topology result is "

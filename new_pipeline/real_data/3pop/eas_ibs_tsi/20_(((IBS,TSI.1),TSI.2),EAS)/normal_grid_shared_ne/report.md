@@ -8,11 +8,12 @@
 
 | quantity | value | |
 |---|---|---|
-| ELBO | +285.91 | +- 0.22 (MC) |
-| logZ (importance sampling) | +299.86 | |
-| ESS of the IS weights | 13.4 / 4000 | LOW -- treat logZ with suspicion |
+| ELBO | +285.76 | +- 0.22 (MC) |
+| logZ (importance sampling) | +302.66 | |
+| ESS of the IS weights | 2.2 / 4000 | LOW -- treat logZ with suspicion |
 | Stan dropped-constant correction | -29.61 | already applied |
-| seed kept / runtime | 13 | 23 s |
+| mode kept / MAP start / runtime | 2 / 0 | 27 s |
+| mode search | 12/12 MAP starts succeeded | 3 distinct modes evaluated |
 
 ## Events (in temporal order, most recent first)
 
@@ -20,7 +21,7 @@
 |---|---|---|---|---|
 | 1 | ADMIXTURE | TSI -> TSI.1 + TSI.2 | 11.2 +- 0.0 | 11.2 |
 | 2 | MERGE | TSI.2 + IBS -> n1 | 81.3 +- 0.3 | 92.5 |
-| 3 | MERGE | TSI.1 + n1 -> n2 | 210.4 +- 0.8 | 303.0 |
+| 3 | MERGE | TSI.1 + n1 -> n2 | 210.5 +- 0.8 | 303.0 |
 | 4 | MERGE | n2 + EAS -> root | 17.2 +- 0.1 | 320.2 |
 
 ## Admixture fraction
@@ -31,20 +32,20 @@
 
 | population | 0-5 gen | 5-10 gen |
 |---|---:|---:|
-| `EAS` | 73,989,915 | 34,956,493 |
-| `IBS` | 2,061,523 | 1,590,920 |
-| `TSI` | 1,722,440 | 1,424,782 |
+| `EAS` | 73,967,576 | 34,947,983 |
+| `IBS` | 2,056,845 | 1,587,299 |
+| `TSI` | 1,720,962 | 1,423,595 |
 
 ## Effective sizes shared by IBD and SNP (haploid)
 
 | node | Ne | sd of log Ne |
 |---|---|---|
-| `EAS` | 869,613 | 0.02 |
-| `IBS` | 595,287 | 0.13 |
-| `TSI` | 770,226 | 0.03 |
-| `TSI.1` | 258,051 | 0.03 |
-| `TSI.2` | 33,386,219 | 0.03 |
-| `n1` | 48,424 | 0.03 |
+| `EAS` | 869,586 | 0.02 |
+| `IBS` | 593,926 | 0.13 |
+| `TSI` | 769,661 | 0.03 |
+| `TSI.1` | 257,940 | 0.03 |
+| `TSI.2` | 33,354,083 | 0.03 |
+| `n1` | 48,410 | 0.03 |
 | `n2` | 96 | 0.01 |
 | `root` | 212 | 0.01 |
 
@@ -54,8 +55,8 @@ log-Ne random-walk step scale tau = 2.231
 
 | component | log-likelihood | n terms | chi2/n |
 |---|---|---|---|
-| IBD | +516.8 | 222 | 34.12 |
-| SNP | +20.6 | 6 | 7.68 |
+| IBD | +516.7 | 222 | 34.12 |
+| SNP | +20.6 | 6 | 7.66 |
 
 IBD chi2/n uses Palamara model-derived Normal variance; SNP chi2/n uses its block SEs. Values near 1 indicate residuals on the modeled noise scale.
 
@@ -63,8 +64,8 @@ IBD chi2/n uses Palamara model-derived Normal variance; SNP chi2/n uses its bloc
 
 | | EAS | IBS | TSI |
 |---|---|---|---|
-| **EAS** | +0.24 | +1.54 | -2.02 |
-| **IBS** | +1.54 | -5.17 | +2.40 |
-| **TSI** | -2.02 | +2.40 | +1.60 |
+| **EAS** | +0.22 | +1.56 | -2.01 |
+| **IBS** | +1.56 | -5.19 | +2.39 |
+| **TSI** | -2.01 | +2.39 | +1.59 |
 
 ![spectrum](spectrum_fit.png)

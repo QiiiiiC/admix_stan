@@ -8,45 +8,46 @@
 
 | quantity | value | |
 |---|---|---|
-| ELBO | -5249.68 | +- 0.41 (MC) |
-| logZ (importance sampling) | -5223.03 | |
-| ESS of the IS weights | 3.8 / 4000 | LOW -- treat logZ with suspicion |
+| ELBO | -5239.15 | +- 0.60 (MC) |
+| logZ (importance sampling) | -5204.55 | |
+| ESS of the IS weights | 1.8 / 4000 | LOW -- treat logZ with suspicion |
 | Stan dropped-constant correction | -17.65 | already applied |
-| seed kept / runtime | 13 | 12 s |
+| mode kept / MAP start / runtime | 2 / 11 | 17 s |
+| mode search | 12/12 MAP starts succeeded | 3 distinct modes evaluated |
 
 ## Events (in temporal order, most recent first)
 
 | # | type | detail | time (gen) | cumulative |
 |---|---|---|---|---|
-| 1 | MERGE | IBS + TSI -> n1 | 247.7 +- 1.0 | 247.7 |
-| 2 | MERGE | EAS + n1 -> root | 108.1 +- 1.5 | 355.8 |
+| 1 | MERGE | IBS + TSI -> n1 | 243.9 +- 1.8 | 243.9 |
+| 2 | MERGE | EAS + n1 -> root | 126.2 +- 0.5 | 370.0 |
 
 ## Recent effective sizes shared by IBD and SNP (haploid)
 
 | population | 0-5 gen | 5-10 gen |
 |---|---:|---:|
-| `EAS` | 80,616,327 | 38,695,291 |
-| `IBS` | 4,480,425 | 2,861,320 |
-| `TSI` | 1,609,473 | 1,094,528 |
+| `EAS` | 91,849,822 | 46,454,734 |
+| `IBS` | 4,486,081 | 2,583,272 |
+| `TSI` | 1,130,785 | 1,040,692 |
 
 ## Effective sizes shared by IBD and SNP (haploid)
 
 | node | Ne | sd of log Ne |
 |---|---|---|
-| `EAS` | 829,934 | 0.03 |
-| `IBS` | 293,115 | 0.03 |
-| `TSI` | 398,372 | 0.05 |
-| `n1` | 599 | 0.02 |
-| `root` | 202 | 0.04 |
+| `EAS` | 830,960 | 0.02 |
+| `IBS` | 292,864 | 0.05 |
+| `TSI` | 399,244 | 0.06 |
+| `n1` | 699 | 0.02 |
+| `root` | 105 | 0.02 |
 
-log-Ne random-walk step scale tau = 2.493
+log-Ne random-walk step scale tau = 2.818
 
 ## Fit quality by component
 
 | component | log-likelihood | n terms | chi2/n |
 |---|---|---|---|
-| IBD | -5,082.8 | 222 | 125.99 |
-| SNP | +30.6 | 6 | 4.33 |
+| IBD | -5,075.2 | 222 | 110.61 |
+| SNP | +24.0 | 6 | 6.53 |
 
 IBD chi2/n uses Poisson counting variance; SNP chi2/n uses its block SEs. Values near 1 indicate residuals on the modeled noise scale.
 
@@ -54,8 +55,8 @@ IBD chi2/n uses Poisson counting variance; SNP chi2/n uses its block SEs. Values
 
 | | EAS | IBS | TSI |
 |---|---|---|---|
-| **EAS** | -0.21 | +0.37 | +0.05 |
-| **IBS** | +0.37 | +1.27 | -2.11 |
-| **TSI** | +0.05 | -2.11 | +1.90 |
+| **EAS** | -0.18 | +0.33 | +0.01 |
+| **IBS** | +0.33 | +1.33 | -2.11 |
+| **TSI** | +0.01 | -2.11 | +1.96 |
 
 ![spectrum](spectrum_fit.png)

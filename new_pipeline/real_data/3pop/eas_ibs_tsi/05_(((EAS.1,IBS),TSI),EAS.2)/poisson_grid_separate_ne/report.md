@@ -8,24 +8,25 @@
 
 | quantity | value | |
 |---|---|---|
-| ELBO | -5169.02 | +- 0.29 (MC) |
-| logZ (importance sampling) | -5144.89 | |
-| ESS of the IS weights | 2.1 / 4000 | LOW -- treat logZ with suspicion |
+| ELBO | -563.21 | +- 0.30 (MC) |
+| logZ (importance sampling) | -536.59 | |
+| ESS of the IS weights | 1.9 / 4000 | LOW -- treat logZ with suspicion |
 | Stan dropped-constant correction | -40.81 | already applied |
-| seed kept / runtime | 7 | 24 s |
+| mode kept / MAP start / runtime | 1 / 11 | 27 s |
+| mode search | 12/12 MAP starts succeeded | 3 distinct modes evaluated |
 
 ## Events (in temporal order, most recent first)
 
 | # | type | detail | time (gen) | cumulative |
 |---|---|---|---|---|
-| 1 | ADMIXTURE | EAS -> EAS.1 + EAS.2 | 11.0 +- 0.0 | 11.0 |
-| 2 | MERGE | EAS.2 + IBS -> n1 | 152.1 +- 1.9 | 163.2 |
-| 3 | MERGE | n1 + TSI -> n2 | 1.0 +- 0.0 | 164.2 |
-| 4 | MERGE | EAS.1 + n2 -> root | 141.4 +- 1.4 | 305.5 |
+| 1 | ADMIXTURE | EAS -> EAS.1 + EAS.2 | 125.7 +- 0.6 | 125.7 |
+| 2 | MERGE | EAS.2 + IBS -> n1 | 2.6 +- 0.1 | 128.3 |
+| 3 | MERGE | n1 + TSI -> n2 | 18.0 +- 0.5 | 146.3 |
+| 4 | MERGE | EAS.1 + n2 -> root | 153.1 +- 1.6 | 299.3 |
 
 ## Admixture fraction
 
-**f = 1.000 +- 0.000** (fraction from `EAS.1`; 0.000 from `EAS.2`)
+**f = 0.998 +- 0.000** (fraction from `EAS.1`; 0.002 from `EAS.2`)
 
 Collapsed to a tree: one source carries <5% of the ancestry, so this graph is behaving as its no-admixture special case.
 
@@ -33,54 +34,54 @@ Collapsed to a tree: one source carries <5% of the ancestry, so this graph is be
 
 | population | 0-5 gen | 5-10 gen |
 |---|---:|---:|
-| `EAS` | 120,095,286 | 77,770,534 |
-| `IBS` | 5,574,456 | 3,553,379 |
-| `TSI` | 1,779,195 | 1,164,240 |
+| `EAS` | 4,124,953 | 3,466,590 |
+| `IBS` | 1,876,998 | 1,447,681 |
+| `TSI` | 1,148,474 | 900,502 |
 
 ## Effective sizes for IBD (haploid)
 
 | node | Ne | sd of log Ne |
 |---|---|---|
-| `EAS` | 5,655,937 | 0.02 |
-| `IBS` | 299,209 | 0.05 |
-| `TSI` | 402,509 | 0.02 |
-| `EAS.1` | 819,457 | 0.01 |
-| `EAS.2` | 12,378 | 0.02 |
-| `n1` | 6,517 | 0.02 |
-| `n2` | 12,458 | 0.03 |
-| `root` | 1,482 | 0.01 |
+| `EAS` | 2,503,167 | 0.04 |
+| `IBS` | 563,558 | 0.04 |
+| `TSI` | 391,117 | 0.06 |
+| `EAS.1` | 47,951 | 0.02 |
+| `EAS.2` | 8,059 | 0.05 |
+| `n1` | 8,636 | 0.03 |
+| `n2` | 25,343 | 0.02 |
+| `root` | 8,750 | 0.01 |
 
-log-Ne random-walk step scale tau_ibd = 2.906
+log-Ne random-walk step scale tau_ibd = 1.658
 
 ## Recent effective sizes for SNP (haploid)
 
 | population | 0-5 gen | 5-10 gen |
 |---|---:|---:|
-| `EAS` | 2,642 | 2,522 |
-| `IBS` | 225,793 | 215,929 |
-| `TSI` | 113,873 | 109,596 |
+| `EAS` | 1,250 | 1,199 |
+| `IBS` | 112,145 | 114,519 |
+| `TSI` | 100,126 | 98,748 |
 
 ## Effective sizes for SNP (haploid)
 
 | node | Ne | sd of log Ne |
 |---|---|---|
-| `EAS` | 1,992 | 0.01 |
-| `IBS` | 171,678 | 0.05 |
-| `TSI` | 99,358 | 0.03 |
-| `EAS.1` | 1,715 | 0.01 |
-| `EAS.2` | 37,779 | 0.02 |
-| `n1` | 32,216 | 0.01 |
-| `n2` | 32,184 | 0.01 |
-| `root` | 11,401 | 0.01 |
+| `EAS` | 1,188 | 0.01 |
+| `IBS` | 113,885 | 0.05 |
+| `TSI` | 102,120 | 0.05 |
+| `EAS.1` | 2,383 | 0.01 |
+| `EAS.2` | 79,622 | 0.06 |
+| `n1` | 78,592 | 0.05 |
+| `n2` | 73,753 | 0.06 |
+| `root` | 14,199 | 0.02 |
 
-log-Ne random-walk step scale tau_snp = 0.775
+log-Ne random-walk step scale tau_snp = 0.757
 
 ## Fit quality by component
 
 | component | log-likelihood | n terms | chi2/n |
 |---|---|---|---|
-| IBD | -4,846.4 | 222 | 40.14 |
-| SNP | +40.5 | 6 | 1.02 |
+| IBD | -358.6 | 222 | 1.05 |
+| SNP | +37.5 | 6 | 2.03 |
 
 IBD chi2/n uses Poisson counting variance; SNP chi2/n uses its block SEs. Values near 1 indicate residuals on the modeled noise scale.
 
@@ -88,8 +89,8 @@ IBD chi2/n uses Poisson counting variance; SNP chi2/n uses its block SEs. Values
 
 | | EAS | IBS | TSI |
 |---|---|---|---|
-| **EAS** | -0.02 | -0.24 | +0.28 |
-| **IBS** | -0.24 | +0.61 | -0.17 |
-| **TSI** | +0.28 | -0.17 | -0.38 |
+| **EAS** | +0.05 | -0.03 | -0.07 |
+| **IBS** | -0.03 | -0.11 | +0.18 |
+| **TSI** | -0.07 | +0.18 | -0.02 |
 
 ![spectrum](spectrum_fit.png)

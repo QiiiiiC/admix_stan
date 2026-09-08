@@ -6,37 +6,38 @@
 
 | quantity | value | |
 |---|---|---|
-| ELBO | -43568.24 | +- 0.29 (MC) |
-| logZ (importance sampling) | -43559.95 | |
-| ESS of the IS weights | 2.9 / 4000 | LOW -- treat logZ with suspicion |
+| ELBO | -43561.51 | +- 0.20 (MC) |
+| logZ (importance sampling) | -43555.45 | |
+| ESS of the IS weights | 2.6 / 4000 | LOW -- treat logZ with suspicion |
 | Stan dropped-constant correction | -12.13 | already applied |
-| seed kept / runtime | 7 | 7 s |
+| mode kept / MAP start / runtime | 1 / 11 | 7 s |
+| mode search | 11/12 MAP starts succeeded | 3 distinct modes evaluated |
 
 ## Events (in temporal order, most recent first)
 
 | # | type | detail | time (gen) | cumulative |
 |---|---|---|---|---|
-| 1 | MERGE | EAS + IBS -> n1 | 283.1 +- 0.8 | 283.1 |
-| 2 | MERGE | n1 + TSI -> root | 7.8 +- 0.4 | 290.9 |
+| 1 | MERGE | EAS + IBS -> n1 | 282.4 +- 1.3 | 282.4 |
+| 2 | MERGE | n1 + TSI -> root | 7.8 +- 0.4 | 290.2 |
 
 ## Effective sizes shared by IBD and SNP (haploid)
 
 | node | Ne | sd of log Ne |
 |---|---|---|
-| `EAS` | 1,185,340 | 0.02 |
-| `IBS` | 241,230 | 0.02 |
-| `TSI` | 326,021 | 0.02 |
-| `n1` | 271 | 0.05 |
-| `root` | 721 | 0.03 |
+| `EAS` | 1,200,337 | 0.01 |
+| `IBS` | 243,584 | 0.02 |
+| `TSI` | 327,934 | 0.02 |
+| `n1` | 274 | 0.06 |
+| `root` | 753 | 0.04 |
 
-log-Ne random-walk step scale tau = 1.545
+log-Ne random-walk step scale tau = 1.607
 
 ## Fit quality by component
 
 | component | log-likelihood | n terms | chi2/n |
 |---|---|---|---|
-| IBD | -7,576.9 | 222 | 6327.28 |
-| SNP | -35,897.0 | 6 | 11980.21 |
+| IBD | -7,570.4 | 222 | 6176.30 |
+| SNP | -35,900.5 | 6 | 11981.38 |
 
 IBD chi2/n uses Poisson counting variance; SNP chi2/n uses its block SEs. Values near 1 indicate residuals on the modeled noise scale.
 
@@ -44,8 +45,8 @@ IBD chi2/n uses Poisson counting variance; SNP chi2/n uses its block SEs. Values
 
 | | EAS | IBS | TSI |
 |---|---|---|---|
-| **EAS** | +112.52 | -124.35 | -97.96 |
-| **IBS** | -124.35 | +92.95 | +154.21 |
-| **TSI** | -97.96 | +154.21 | +41.70 |
+| **EAS** | +112.55 | -124.32 | -98.04 |
+| **IBS** | -124.32 | +93.06 | +154.03 |
+| **TSI** | -98.04 | +154.03 | +42.03 |
 
 ![spectrum](spectrum_fit.png)

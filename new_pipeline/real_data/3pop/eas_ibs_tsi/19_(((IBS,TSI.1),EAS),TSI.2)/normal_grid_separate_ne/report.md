@@ -8,79 +8,78 @@
 
 | quantity | value | |
 |---|---|---|
-| ELBO | +40.62 | +- 1.15 (MC) |
-| logZ (importance sampling) | +117.38 | |
-| ESS of the IS weights | 1.0 / 4000 | LOW -- treat logZ with suspicion |
+| ELBO | +1152.52 | +- 0.22 (MC) |
+| logZ (importance sampling) | +1171.22 | |
+| ESS of the IS weights | 3.2 / 4000 | LOW -- treat logZ with suspicion |
 | Stan dropped-constant correction | -40.81 | already applied |
-| seed kept / runtime | 7 | 24 s |
+| mode kept / MAP start / runtime | 1 / 3 | 26 s |
+| mode search | 12/12 MAP starts succeeded | 3 distinct modes evaluated |
 
 ## Events (in temporal order, most recent first)
 
 | # | type | detail | time (gen) | cumulative |
 |---|---|---|---|---|
-| 1 | ADMIXTURE | TSI -> TSI.1 + TSI.2 | 11.0 +- 0.0 | 11.0 |
-| 2 | MERGE | TSI.2 + IBS -> n1 | 135.4 +- 3.8 | 146.4 |
-| 3 | MERGE | n1 + EAS -> n2 | 207.3 +- 2.9 | 353.6 |
-| 4 | MERGE | TSI.1 + n2 -> root | 253.6 +- 1.5 | 607.2 |
+| 1 | ADMIXTURE | TSI -> TSI.1 + TSI.2 | 107.0 +- 0.6 | 107.0 |
+| 2 | MERGE | TSI.2 + IBS -> n1 | 12.0 +- 0.0 | 119.0 |
+| 3 | MERGE | n1 + EAS -> n2 | 227.9 +- 1.6 | 346.9 |
+| 4 | MERGE | TSI.1 + n2 -> root | 163.0 +- 0.9 | 509.9 |
 
 ## Admixture fraction
 
-**f = 0.027 +- 0.003** (fraction from `TSI.1`; 0.973 from `TSI.2`)
-
-Collapsed to a tree: one source carries <5% of the ancestry, so this graph is behaving as its no-admixture special case.
+**f = 0.801 +- 0.002** (fraction from `TSI.1`; 0.199 from `TSI.2`)
 
 ## Recent effective sizes for IBD (haploid)
 
 | population | 0-5 gen | 5-10 gen |
 |---|---:|---:|
-| `EAS` | 21,264,532 | 16,045,736 |
-| `IBS` | 3,388,340 | 2,351,966 |
-| `TSI` | 2,250,483 | 1,419,834 |
+| `EAS` | 31,764,358 | 19,599,354 |
+| `IBS` | 1,797,886 | 1,468,513 |
+| `TSI` | 1,046,350 | 717,776 |
 
 ## Effective sizes for IBD (haploid)
 
 | node | Ne | sd of log Ne |
 |---|---|---|
-| `EAS` | 880,281 | 0.04 |
-| `IBS` | 276,559 | 0.05 |
-| `TSI` | 468,503 | 0.12 |
-| `TSI.1` | 989 | 0.27 |
-| `TSI.2` | 549,817 | 0.16 |
-| `n1` | 25,802 | 0.13 |
-| `n2` | 39 | 0.06 |
-| `root` | 11,538 | 0.00 |
+| `EAS` | 1,104,712 | 0.03 |
+| `IBS` | 646,376 | 0.05 |
+| `TSI` | 407,403 | 0.04 |
+| `TSI.1` | 56,402 | 0.02 |
+| `TSI.2` | 21,148 | 0.02 |
+| `n1` | 16,613 | 0.02 |
+| `n2` | 17 | 0.04 |
+| `root` | 13,021 | 0.00 |
 
-log-Ne random-walk step scale tau_ibd = 2.415
+log-Ne random-walk step scale tau_ibd = 2.270
 
 ## Recent effective sizes for SNP (haploid)
 
 | population | 0-5 gen | 5-10 gen |
 |---|---:|---:|
-| `EAS` | 1,535 | 1,625 |
-| `IBS` | 342,910 | 352,349 |
-| `TSI` | 57,932 | 58,124 |
+| `EAS` | 2,024 | 1,785 |
+| `IBS` | 448,138 | 444,460 |
+| `TSI` | 830,372 | 919,147 |
 
 ## Effective sizes for SNP (haploid)
 
 | node | Ne | sd of log Ne |
 |---|---|---|
-| `EAS` | 2,060 | 0.02 |
-| `IBS` | 397,758 | 0.03 |
-| `TSI` | 56,661 | 0.03 |
-| `TSI.1` | 8,732 | 0.05 |
-| `TSI.2` | 62,676 | 0.02 |
-| `n1` | 27,875 | 0.07 |
-| `n2` | 28,674 | 0.09 |
-| `root` | 18,631 | 0.01 |
+| `EAS` | 1,927 | 0.01 |
+| `IBS` | 375,862 | 0.04 |
+| `TSI` | 978,934 | 0.03 |
+| `TSI.1` | 635,511 | 0.03 |
+| `TSI.2` | 257,275 | 0.04 |
+| `n1` | 238,403 | 0.04 |
+| `n2` | 75,306 | 0.01 |
+| `root` | 24,858 | 0.01 |
 
-log-Ne random-walk step scale tau_snp = 0.668
+log-Ne random-walk step scale tau_snp = 0.848
 
 ## Fit quality by component
 
 | component | log-likelihood | n terms | chi2/n |
 |---|---|---|---|
-| IBD | +333.3 | 222 | 36.31 |
-| SNP | +23.8 | 6 | 6.60 |
+| IBD | +1,404.6 | 222 | 26.52 |
+| SNP | +42.1 | 6 | 0.50 |
 
 IBD chi2/n uses Palamara model-derived Normal variance; SNP chi2/n uses its block SEs. Values near 1 indicate residuals on the modeled noise scale.
 
@@ -88,8 +87,8 @@ IBD chi2/n uses Palamara model-derived Normal variance; SNP chi2/n uses its bloc
 
 | | EAS | IBS | TSI |
 |---|---|---|---|
-| **EAS** | -0.06 | -0.61 | +0.73 |
-| **IBS** | -0.61 | +1.28 | -0.13 |
-| **TSI** | +0.73 | -0.13 | -1.28 |
+| **EAS** | +0.05 | -0.31 | +0.22 |
+| **IBS** | -0.31 | +0.37 | +0.23 |
+| **TSI** | +0.22 | +0.23 | -0.63 |
 
 ![spectrum](spectrum_fit.png)

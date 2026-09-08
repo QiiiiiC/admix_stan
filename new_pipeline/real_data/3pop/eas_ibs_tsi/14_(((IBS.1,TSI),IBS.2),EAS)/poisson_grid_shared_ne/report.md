@@ -8,24 +8,25 @@
 
 | quantity | value | |
 |---|---|---|
-| ELBO | -5353.37 | +- 0.93 (MC) |
-| logZ (importance sampling) | -5298.49 | |
-| ESS of the IS weights | 1.4 / 4000 | LOW -- treat logZ with suspicion |
+| ELBO | -4907.88 | +- 0.63 (MC) |
+| logZ (importance sampling) | -4868.94 | |
+| ESS of the IS weights | 1.2 / 4000 | LOW -- treat logZ with suspicion |
 | Stan dropped-constant correction | -29.61 | already applied |
-| seed kept / runtime | 13 | 21 s |
+| mode kept / MAP start / runtime | 1 / 3 | 26 s |
+| mode search | 12/12 MAP starts succeeded | 3 distinct modes evaluated |
 
 ## Events (in temporal order, most recent first)
 
 | # | type | detail | time (gen) | cumulative |
 |---|---|---|---|---|
-| 1 | ADMIXTURE | IBS -> IBS.1 + IBS.2 | 243.4 +- 0.9 | 243.4 |
-| 2 | MERGE | IBS.2 + TSI -> n1 | 1.0 +- 0.0 | 244.4 |
-| 3 | MERGE | IBS.1 + n1 -> n2 | 1.0 +- 0.0 | 245.4 |
-| 4 | MERGE | n2 + EAS -> root | 120.6 +- 2.6 | 366.0 |
+| 1 | ADMIXTURE | IBS -> IBS.1 + IBS.2 | 86.1 +- 1.0 | 86.1 |
+| 2 | MERGE | IBS.2 + TSI -> n1 | 29.9 +- 0.9 | 116.0 |
+| 3 | MERGE | IBS.1 + n1 -> n2 | 186.8 +- 1.4 | 302.8 |
+| 4 | MERGE | n2 + EAS -> root | 25.0 +- 0.2 | 327.8 |
 
 ## Admixture fraction
 
-**f = 0.002 +- 0.000** (fraction from `IBS.1`; 0.998 from `IBS.2`)
+**f = 0.025 +- 0.001** (fraction from `IBS.1`; 0.975 from `IBS.2`)
 
 Collapsed to a tree: one source carries <5% of the ancestry, so this graph is behaving as its no-admixture special case.
 
@@ -33,31 +34,31 @@ Collapsed to a tree: one source carries <5% of the ancestry, so this graph is be
 
 | population | 0-5 gen | 5-10 gen |
 |---|---:|---:|
-| `EAS` | 80,743,378 | 38,572,738 |
-| `IBS` | 4,714,357 | 2,903,937 |
-| `TSI` | 1,486,877 | 1,034,221 |
+| `EAS` | 59,943,784 | 32,404,174 |
+| `IBS` | 1,461,632 | 1,416,637 |
+| `TSI` | 1,642,728 | 1,070,721 |
 
 ## Effective sizes shared by IBD and SNP (haploid)
 
 | node | Ne | sd of log Ne |
 |---|---|---|
-| `EAS` | 829,764 | 0.03 |
-| `IBS` | 299,257 | 0.12 |
-| `TSI` | 401,418 | 0.08 |
-| `IBS.1` | 682 | 0.03 |
-| `IBS.2` | 811 | 0.05 |
-| `n1` | 799 | 0.04 |
-| `n2` | 676 | 0.03 |
-| `root` | 131 | 0.08 |
+| `EAS` | 832,717 | 0.03 |
+| `IBS` | 773,797 | 0.06 |
+| `TSI` | 378,387 | 0.06 |
+| `IBS.1` | 127 | 0.08 |
+| `IBS.2` | 43,569 | 0.06 |
+| `n1` | 114,313 | 0.05 |
+| `n2` | 140 | 0.01 |
+| `root` | 607 | 0.02 |
 
-log-Ne random-walk step scale tau = 2.445
+log-Ne random-walk step scale tau = 2.379
 
 ## Fit quality by component
 
 | component | log-likelihood | n terms | chi2/n |
 |---|---|---|---|
-| IBD | -5,091.4 | 222 | 112.02 |
-| SNP | +31.5 | 6 | 4.04 |
+| IBD | -4,720.5 | 222 | 38.62 |
+| SNP | +35.4 | 6 | 2.74 |
 
 IBD chi2/n uses Poisson counting variance; SNP chi2/n uses its block SEs. Values near 1 indicate residuals on the modeled noise scale.
 
@@ -65,8 +66,8 @@ IBD chi2/n uses Poisson counting variance; SNP chi2/n uses its block SEs. Values
 
 | | EAS | IBS | TSI |
 |---|---|---|---|
-| **EAS** | +0.10 | +0.65 | -0.85 |
-| **IBS** | +0.65 | -1.20 | -0.04 |
-| **TSI** | -0.85 | -0.04 | +1.65 |
+| **EAS** | -0.11 | +0.88 | -0.67 |
+| **IBS** | +0.88 | -0.79 | -0.95 |
+| **TSI** | -0.67 | -0.95 | +2.17 |
 
 ![spectrum](spectrum_fit.png)
