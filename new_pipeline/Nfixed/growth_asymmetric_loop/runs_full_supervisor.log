@@ -1,0 +1,5 @@
+22 graph shapes, 29 valid event orders
+50 x 50.0 cM per pool; 1500.0 cM per subsample; no held-out blocks
+10 overlapping subsamples/pool; 2320 candidate fits (each with 3 Pathfinder starts)
+Correct backbone: ['g15_o1', 'g15_o2', 'g22_o1', 'g22_o2']
+Manifest: /Users/qichen/github/admix_stan/new_pipeline/Nfixed/growth_asymmetric_loop/runs/default/manifest.json
