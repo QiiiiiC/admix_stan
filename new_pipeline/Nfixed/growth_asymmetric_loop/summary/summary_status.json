@@ -1,0 +1,7 @@
+{
+  "expected_fits": 2320,
+  "attempted": 2320,
+  "failed": 0,
+  "reliable": 0,
+  "note": "Overlapping genome subsamples; composite-likelihood importance estimates; descriptive plots include unreliable fits."
+}
