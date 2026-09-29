@@ -1,0 +1,9 @@
+{
+  "subsamples_per_length": 100,
+  "expected_fits": 12000,
+  "attempted": 12000,
+  "failed": 0,
+  "reliable": 748,
+  "complete_contrasts": 4000,
+  "note": "Subsamples overlap (blocks drawn without replacement from one pool of 100); ELBO is the ranking statistic."
+}

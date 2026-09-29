@@ -1,0 +1,98 @@
+{
+  "seed": 20260929,
+  "pools": 1,
+  "blocks": 100,
+  "block_cm": 25.0,
+  "genome_cm": [
+    50,
+    100,
+    150,
+    200,
+    300,
+    500,
+    750,
+    1000
+  ],
+  "replicates": 100,
+  "nuts_replicates": 10,
+  "diploid_samples": 20,
+  "recombination_rate": 1e-08,
+  "mutation_rate": 1.25e-08,
+  "ancestry_model": "smc",
+  "bin_edges_cm": [
+    1.0,
+    1.5,
+    2.0,
+    2.5,
+    3.0,
+    3.5,
+    4.0,
+    4.5,
+    5.0,
+    5.5,
+    6.0,
+    6.5,
+    7.0,
+    7.5,
+    8.0,
+    8.5,
+    9.0,
+    9.5,
+    10.0,
+    12.0,
+    15.0,
+    20.0,
+    25.0
+  ],
+  "times": {
+    "b_admix": 20,
+    "ab": 60,
+    "cb": 100,
+    "cbd": 200,
+    "root": 400
+  },
+  "fraction_b1": 0.7,
+  "snp_min_maf": 0.05,
+  "snp_ancestral_only": true,
+  "snp_se_block_cm": 5.0,
+  "fit_seeds": [
+    1,
+    7,
+    13
+  ],
+  "pathfinder_paths": 4,
+  "pathfinder_draws": 1000,
+  "keep_stan_csv": false,
+  "minimum_importance_ess": 100.0,
+  "maximum_pareto_k": 0.7,
+  "T_max": 100000.0,
+  "nuts": {
+    "chains": 4,
+    "warmup": 500,
+    "samples": 1000,
+    "adapt_delta": 0.95
+  },
+  "haploid_ne": {
+    "a": 20000,
+    "b": 5000,
+    "c": 12000,
+    "d": 8000,
+    "b1": 16000,
+    "b2": 6000,
+    "ab": 12000,
+    "cb": 10000,
+    "cbd": 15000,
+    "root": 15000
+  },
+  "trees_from": "simulation_study/four_leaf_b_admixture_varying_ne/runs/default/pool_000",
+  "sources": [
+    "true",
+    "hapibd"
+  ],
+  "hapibd": {
+    "min_seed": 1.0,
+    "min_output": 1.0,
+    "threads": 1
+  },
+  "nuts_source": "true"
+}
