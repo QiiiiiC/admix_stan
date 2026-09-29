@@ -1,0 +1,4 @@
+3 candidates x 3 models; SNP-only fitted once per subsample
+100 x 25.0 cM blocks per pool; genome lengths [50, 100, 150, 200, 300, 500, 750, 1000] cM
+100 subsamples per length (blocks without replacement); 12000 fits (each with 3 Pathfinder starts)
+Manifest: /Users/qichen/github/admix_stan/simulation_study/admix_thru_b_plus_ancient/runs/default/manifest.json (3 candidates)

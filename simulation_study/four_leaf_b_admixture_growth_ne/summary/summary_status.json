@@ -1,0 +1,11 @@
+{
+  "pathfinder": {
+    "fits": 6400,
+    "failed": 0
+  },
+  "nuts": {
+    "fits": 0,
+    "failed": 0,
+    "converged": 0
+  }
+}
