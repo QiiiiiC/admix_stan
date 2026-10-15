@@ -19,7 +19,7 @@ import numpy as np
 from study import (HERE, ROOT, POPS, SCENARIOS, SOURCES, VARIANTS, load_config, edges, n_haploid,
                    candidates, selections, msprime_demography, true_ibd, hapibd, snp_summaries,
                    aggregate, stan_data, save_json, event_parameters, branch_map, reference)
-from methods import fitting, ibd, models, parallel, simulate as sim
+from methods import fitting, ibd, models, parallel, simulate as sim, snp
 from methods.blocks import load_blocks
 from methods.diagnostics import fit_summary
 from methods.fitting import parameter_summary
@@ -83,7 +83,7 @@ def simulate(c, a):
                                             c["recombination_rate"], c["mutation_rate"], seed,
                                             model=c["ancestry_model"])
                     ts.dump(tree_file)
-                if "snp_numer" not in values:
+                if not snp.is_current(values):
                     values.update(snp_summaries(ts, c))
                 for source in a.sources:
                     if source+"_count" in values:

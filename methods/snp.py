@@ -3,16 +3,28 @@
 Per genome block we keep additive sums over SNP sub-blocks, so any subsample of
 blocks can be aggregated without touching genotypes again:
 
-  numer[k] = sum_snps outer(f - fbar, f - fbar)     (L x L)
-  denom[k] = sum_snps fbar (1 - fbar)
+  numer[k] = sum_snps outer(f - fbar, f - fbar) / (fbar (1 - fbar))     (L x L)
+  denom[k] = number of SNPs
 
-W = sum numer / sum denom (ratio of sums), minus the finite-sample correction
-C diag(1/n_i) C, where C is the L x L centering matrix.  The SE is a
-delete-one-sub-block jackknife over every sub-block of the chosen blocks.
+Each SNP is scaled by its own heterozygosity fbar (1 - fbar), so W = sum numer /
+sum denom is the average of the per-SNP scaled products (as TreeMix -scale),
+minus the finite-sample correction C diag(1/n_i) C, where C is the L x L
+centering matrix.  The SE is a delete-one-sub-block jackknife over every
+sub-block of the chosen blocks.
+
+Caches written before this scaling (ratio of sums, denom = sum fbar (1 - fbar))
+lack the key "snp_scaling"; is_current() tells them apart so they are recomputed.
 """
 from __future__ import annotations
 
 import numpy as np
+
+SCALING = "per_snp"
+
+
+def is_current(values):
+    """True if cached SNP summaries were computed with the current scaling."""
+    return "snp_numer" in values and str(values.get("snp_scaling")) == SCALING
 
 
 def snp_summaries(ts, pops, block_cm, sub_block_cm, recombination_rate, min_maf=0.05,
@@ -42,10 +54,10 @@ def snp_summaries(ts, pops, block_cm, sub_block_cm, recombination_rate, min_maf=
             continue
         k = min(n - 1, int(var.site.position * 100 * recombination_rate / sub_block_cm))
         dev = freq - mean
-        numer[k] += np.outer(dev, dev)
-        denom[k] += mean * (1 - mean)
+        numer[k] += np.outer(dev, dev) / (mean * (1 - mean))
+        denom[k] += 1
         sites[k] += 1
-    return dict(snp_numer=numer, snp_denom=denom, snp_sites=sites)
+    return dict(snp_numer=numer, snp_denom=denom, snp_sites=sites, snp_scaling=np.asarray(SCALING))
 
 
 def snp_covariance(numer, denom, n_haploid):

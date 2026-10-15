@@ -84,7 +84,6 @@
     "cbd": 15000,
     "root": 15000
   },
-  "trees_from": "simulation_study/four_leaf_b_admixture_varying_ne/runs/default/pool_000",
   "sources": [
     "true",
     "hapibd"

@@ -127,6 +127,15 @@ class MethodsTests(unittest.TestCase):
             self.assertEqual((models.STAN / f"{name}_poisson.stan").read_text(),
                              mp.convert((models.STAN / f"{name}.stan").read_text(), mixed), name)
 
+    def test_poisson_models_carry_no_ibd_fraction(self):
+        """The Poisson likelihood reads `ibd_number` only: no Poisson model computes the
+        IBD-fraction integral; the normal-likelihood models still do."""
+        import re
+        for spec in models.MODELS.values():
+            code = re.sub(r"//[^\n]*", "", spec.path.read_text())
+            used = "ibd_fraction" in code or re.search(r"\bint_p_L\b", code) is not None
+            self.assertEqual(used, spec.likelihood == "normal", spec.name)
+
     def test_bridge_recovers_known_normaliser(self):
         """Unnormalised N(0, S) in 3-d: log Z = 0.5 log det(2 pi S) + offset, recovered to its error."""
         from methods.evidence import bridge

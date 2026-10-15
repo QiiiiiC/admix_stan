@@ -1,0 +1,20 @@
+{
+  "trees_from": "new_pipeline/Nfixed/growth_asymmetric_loop/runs/default/constant/pool_000",
+  "leaves": ["a", "b", "c"],
+  "blocks": 50,
+  "block_cm": 50.0,
+  "diploid_samples": 15,
+  "recombination_rate": 1e-08,
+  "snp_min_maf": 0.05,
+  "snp_min_mutation_time": 300,
+  "snp_se_block_cm": 10.0,
+  "bin_edges_cm": [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 12.0, 15.0, 20.0, 25.0],
+  "T_max": 100000.0,
+  "use_snp": 1,
+  "seed": 20261001,
+  "genome_cm": [50, 100, 250, 1000],
+  "replicates": 1,
+  "optimize_starts": 8,
+  "lambdas": [1.0, 0.5, 0.25, 0.1],
+  "em": {"iterations": 12, "tolerance": 0.005, "chains": 4, "warmup": 300, "samples": 250, "mstep_draws": 100}
+}

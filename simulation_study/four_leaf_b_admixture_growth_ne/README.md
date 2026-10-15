@@ -48,14 +48,15 @@ the missing ones from the saved tree sequences.
 
 ## One pipeline, two designs
 
-The code here also reruns the varying-Ne design
-(`../four_leaf_b_admixture_varying_ne/pipeline_config.json`).  Its config names
-`trees_from`, so `simulate` re-reads that study's saved tree sequences and
-re-extracts IBD in these 22 bins, rather than simulating.  Its subsamples are
-identical to the original study's.
+The code here also runs the varying-Ne design, `../four_leaf_b_admixture_varying_ne`,
+which holds only its config, run and summary: same bins, models, NUTS comparison and
+figures, different branch sizes (an explicit `haploid_ne` table instead of `growth`).
 
 ```sh
 python execute_full.py --stages simulate fit summarize     # Pathfinder part
 python execute_full.py --stages nuts summarize              # NUTS part
+python execute_full.py --config ../four_leaf_b_admixture_varying_ne/config.json \
+    --out ../four_leaf_b_admixture_varying_ne/runs/default \
+    --publish ../four_leaf_b_admixture_varying_ne/summary --stages simulate fit nuts summarize
 python -B -m unittest test_design -v
 ```

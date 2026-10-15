@@ -4,8 +4,8 @@
     "failed": 0
   },
   "nuts": {
-    "fits": 0,
+    "fits": 160,
     "failed": 0,
-    "converged": 0
+    "converged": 8
   }
 }

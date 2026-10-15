@@ -1,27 +1,4 @@
 functions {
-    real int_p_L(real N, real t1, real t2, real u, real v) {
-        if (t2 - t1 < 1e-10) return 0.0;
-
-        real cu = -(1.0/N + u/50.0);
-        real cv = -(1.0/N + v/50.0);
-
-        real eu1 = exp(-u * t1 / 50.0);
-        real eu2 = exp((t1 - t2) / N - u * t2 / 50.0);
-        real ev1 = exp(-v * t1 / 50.0);
-        real ev2 = exp((t1 - t2) / N - v * t2 / 50.0);
-
-        real cu2 = cu * cu;
-        real cv2 = cv * cv;
-
-        real k1 = u/(50.0*N) * (eu2 * (cu*t2 - 1.0)/cu2 - eu1 * (cu*t1 - 1.0)/cu2);
-        real k2 = v/(50.0*N) * (ev2 * (cv*t2 - 1.0)/cv2 - ev1 * (cv*t1 - 1.0)/cv2);
-
-        real k3 = 1.0/N * (eu2/cu - eu1/cu);
-        real k4 = 1.0/N * (ev2/cv - ev1/cv);
-
-        return k1 - k2 + k3 - k4;
-    }
-
     real int_p_LL(real N, real t1, real t2, real u, real v){
         if (t2 - t1 < 1e-10) return 0.0;
 
@@ -122,10 +99,8 @@ transformed parameters {
     // ================================================================
     // 2. Compute IBD fractions via joint path tracking
     // ================================================================
-    array[n_bins] matrix[n_leaves, n_leaves] ibd_fraction;
     array[n_bins] matrix[n_leaves, n_leaves] ibd_number;
     for (b in 1:n_bins) {
-        ibd_fraction[b] = rep_matrix(0.0, n_leaves, n_leaves);
         ibd_number[b] = rep_matrix(0.0, n_leaves, n_leaves);
     }
 
@@ -165,9 +140,6 @@ transformed parameters {
 
                 if (w_diag > 1e-20) {
                     for (b in 1:n_bins) {
-                        ibd_fraction[b][li, lj] += w_diag *
-                            int_p_L(Ne[a], t_start, t_end,
-                                    bin_length[b, 1], bin_length[b, 2]);
                         ibd_number[b][li, lj] += w_diag *
                             int_p_LL(Ne[a], t_start, t_end,
                                      bin_length[b, 1], bin_length[b, 2]);
@@ -180,7 +152,6 @@ transformed parameters {
 
         if (li != lj) {
             for (b in 1:n_bins) {
-                ibd_fraction[b][lj, li] = ibd_fraction[b][li, lj];
                 ibd_number[b][lj, li] = ibd_number[b][li, lj];
             }
         }

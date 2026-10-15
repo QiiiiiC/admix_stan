@@ -1,28 +1,4 @@
 functions {
-    real int_p_L(real N, real t1, real t2, real u, real v) {
-        if (t2 - t1 < 1e-10) return 0.0;  // zero-length epoch
-
-        real cu = -(1.0/N + u/50.0);
-        real cv = -(1.0/N + v/50.0);
-        
-        // Push exp(t1/N) inside the calculation to avoid Inf * 0 = NaN
-        real eu1 = exp(-u * t1 / 50.0);
-        real eu2 = exp((t1 - t2) / N - u * t2 / 50.0);
-        real ev1 = exp(-v * t1 / 50.0);
-        real ev2 = exp((t1 - t2) / N - v * t2 / 50.0);
-        
-        real cu2 = cu * cu;
-        real cv2 = cv * cv;
-
-        real k1 = u/(50.0*N) * (eu2 * (cu*t2 - 1.0)/cu2 - eu1 * (cu*t1 - 1.0)/cu2);
-        real k2 = v/(50.0*N) * (ev2 * (cv*t2 - 1.0)/cv2 - ev1 * (cv*t1 - 1.0)/cv2);
-        
-        real k3 = 1.0/N * (eu2/cu - eu1/cu);
-        real k4 = 1.0/N * (ev2/cv - ev1/cv);
-
-        return k1 - k2 + k3 - k4;
-    }
-
     real int_p_LL(real N, real t1, real t2, real u, real v){
         if (t2 - t1 < 1e-10) return 0.0;  // zero-length epoch
 
@@ -119,16 +95,16 @@ transformed parameters {
     // The key question: what does W carry exactly?
     //
     // We define W so that the IBD contribution from epoch e is:
-    //   sum_a W[a,a] * int_p_L(N_a, t_start, t_end, u, v)
+    //   sum_a W[a,a] * int_p_LL(N_a, t_start, t_end, u, v)
     //
-    // Since int_p_L(N, t1, t2, u, v) is the FULL conditional IBD
+    // Since int_p_LL(N, t1, t2, u, v) is the FULL conditional IBD
     // integral (given lineages are co-located in pop N at t1), the
     // weight W[a,a] must carry:
     //   - path probability (admixture fractions)
     //   - survival (no coalescence) in all PREVIOUS epochs
     //
     // Survival in epoch with duration d in population of size N is
-    // S = exp(-d/N). But int_p_L already "knows" the epoch starts at
+    // S = exp(-d/N). But int_p_LL already "knows" the epoch starts at
     // t_start — it integrates (1/N)exp(-(t - t_start)/N).
     //
     // So W[a,a] after epoch e must be:
@@ -145,10 +121,8 @@ transformed parameters {
     // passes through unchanged.
     // ================================================================
 
-    array[n_bins] matrix[n_leaves, n_leaves] ibd_fraction;
     array[n_bins] matrix[n_leaves, n_leaves] ibd_number;
     for (b in 1:n_bins) {
-        ibd_fraction[b] = rep_matrix(0.0, n_leaves, n_leaves);
         ibd_number[b] = rep_matrix(0.0, n_leaves, n_leaves);
     }
 
@@ -192,11 +166,8 @@ transformed parameters {
 
                 if (w_diag > 1e-20) {
                     // IBD: W[a,a] carries path weights * prior survival.
-                    // int_p_L gives the conditional IBD integral for this epoch.
+                    // int_p_LL gives the conditional IBD integral for this epoch.
                     for (b in 1:n_bins) {
-                        ibd_fraction[b][li, lj] += w_diag *
-                            int_p_L(effective_N, t_start, t_end,
-                                    bin_length[b, 1], bin_length[b, 2]);
                         ibd_number[b][li, lj] += w_diag * int_p_LL(effective_N, t_start, t_end,
                                     bin_length[b, 1], bin_length[b, 2]);
                     }
@@ -210,7 +181,6 @@ transformed parameters {
         // Fill symmetric entry
         if (li != lj) {
             for (b in 1:n_bins) {
-                ibd_fraction[b][lj, li] = ibd_fraction[b][li, lj];
                 ibd_number[b][lj, li] = ibd_number[b][li, lj];
             }
         }

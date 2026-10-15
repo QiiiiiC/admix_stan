@@ -11,6 +11,12 @@ The derived model is the original with three changes and nothing else:
     *_Nsmooth_poisson models (lambda = segments per pair per cM * cM * pairs)
   * final IBD epoch anchored to the root (`t_end = t_root + T_max`), as in the
     Nsmooth models, instead of the absolute `t_end = T_max`
+  * the IBD-fraction integral (`int_p_L`, `ibd_fraction`) removed: only the normal
+    likelihood reads it, the Poisson one uses `ibd_number` alone
+
+`drop_fraction` is the last change on its own; the hand-written *_poisson models
+(mixed_model_Nsmooth_poisson, *_separate_ne) had it applied once with
+`python make_poisson.py --drop-fraction FILE`.
 
 plus component `lp_ibd`/`chi2_ibd` (and `lp_snp`/`chi2_snp`) generated quantities.
 An original that already anchors the final epoch keeps its own; an original whose
@@ -18,6 +24,8 @@ generated quantities only report the normal likelihood (they read `ibd_hat`) has
 them replaced, since those quantities no longer exist in the derived model.
 """
 from pathlib import Path
+import re
+import sys
 
 HERE = Path(__file__).resolve().parent
 SOURCES = [("ibd_model_Nfixed", False), ("mixed_model_Nfixed", True),
@@ -94,6 +102,29 @@ def loop_end(src, start):
 
 
 ANCHORED = "t_end = cumulative_times[n_events] + T_max;"
+FRACTION = [  # every statement that touches ibd_fraction; each occurs exactly once
+    r"[ \t]*array\[n_bins\] matrix\[n_leaves, n_leaves\] ibd_fraction;\n",
+    r"[ \t]*ibd_fraction\[b\] = rep_matrix\(0\.0, n_leaves, n_leaves\);\n",
+    r"[ \t]*ibd_fraction\[b\]\[li, lj\] \+= w_diag \*\s*int_p_L\([^;]*\);\n",
+    r"[ \t]*ibd_fraction\[b\]\[lj, li\] = ibd_fraction\[b\]\[li, lj\];\n",
+]
+
+
+def drop_fraction(src):
+    """Remove the IBD-fraction integral from a Poisson model: the function `int_p_L`
+    and every statement on `ibd_fraction`.  Nothing else in the model reads them, so
+    the density and every other output are unchanged."""
+    start, end = src.index("    real int_p_L("), src.index("    real int_p_LL(")
+    src = src[:start] + src[end:]
+    for pattern in FRACTION:
+        src, n = re.subn(pattern, "", src)
+        if n != 1:
+            raise ValueError(f"expected exactly one match of {pattern!r}, found {n}")
+    src = re.sub(r"\bint_p_L\b", "int_p_LL", src)            # comments that describe the integral
+    code = re.sub(r"//[^\n]*", "", src)
+    if "ibd_fraction" in code or re.search(r"\bint_p_L\b", code):
+        raise ValueError("IBD-fraction code left in the model")
+    return src
 
 
 def convert(src, mixed):
@@ -122,10 +153,16 @@ def convert(src, mixed):
         src = src.replace(old, SNP_COMMENT_NEW)
     if "ibd_hat" in src or "ibd_se" in src:
         raise ValueError("normal-likelihood IBD data left in the derived model")
+    src = drop_fraction(src)
     return src.rstrip() + "\n" + GQ_IBD + (GQ_SNP if mixed else "") + "}\n"
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--drop-fraction"]:
+        for name in sys.argv[2:]:
+            (HERE / name).write_text(drop_fraction((HERE / name).read_text()))
+            print(f"{name}: IBD-fraction integral removed")
+        sys.exit()
     for name, mixed in SOURCES:
         out = HERE / f"{name}_poisson.stan"
         out.write_text(convert((HERE / f"{name}.stan").read_text(), mixed))

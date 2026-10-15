@@ -23,7 +23,7 @@ import numpy as np
 from study import (HERE, ROOT, POPS, GRAPHS, MODEL_NAMES, load_config, edges, n_haploid, parameters,
                    selections, fit_tasks, nuts_tasks, msprime_demography, true_ibd, hapibd, snp_summaries, aggregate,
                    stan_data, save_json)
-from methods import evidence, fitting, ibd, models, parallel, simulate as sim
+from methods import evidence, fitting, ibd, models, parallel, simulate as sim, snp
 from methods.blocks import load_blocks
 from methods.diagnostics import fit_summary
 from methods.fitting import parameter_summary
@@ -55,17 +55,15 @@ def hapibd_provenance(command):
 
 
 def simulate(c, a):
-    """Prepare the block caches.  Simulate every block, or -- when the config names
-    `trees_from` -- re-read the tree sequences an earlier run already simulated; then
-    extract SNP sums and every configured IBD source a cache still lacks.  hap-IBD's
+    """Prepare the block caches.  A block's tree sequence is simulated once and saved
+    beside its cache (later calls read it back); SNP sums and every configured IBD
+    source a cache still lacks are extracted from it.  hap-IBD's
     input VCF is deleted after the call (it is regenerated from the trees on demand);
     its segment files and log stay beside the cache."""
     import msprime
     import tskit
     folder = pool(a.out); folder.mkdir(parents=True, exist_ok=True)
-    source = (ROOT / c["trees_from"]).resolve() if "trees_from" in c else None
-    provenance = {"msprime": msprime.__version__, "tskit": tskit.__version__, "numpy": np.__version__,
-                  "trees_from": str(source) if source else None}
+    provenance = {"msprime": msprime.__version__, "tskit": tskit.__version__, "numpy": np.__version__}
     command = ibd.hapibd_command() if "hapibd" in c["sources"] else None
     if command:
         hap = hapibd_provenance(command)
@@ -74,7 +72,7 @@ def simulate(c, a):
             raise ValueError("hap-IBD command or jar changed; use a new run directory.")
         save_json(saved, hap)
     save_json(folder / "provenance.json", provenance)
-    msdem = None if source else msprime_demography(c)
+    msdem = msprime_demography(c)
     for block in range(c["blocks"]):
         if not parallel.in_slice(block, a.block_slice):
             continue
@@ -84,16 +82,15 @@ def simulate(c, a):
         if not missing:
             continue
         t0 = time.monotonic()
-        trees = (source or folder) / f"block_{block:03d}.trees"
+        trees = folder / f"block_{block:03d}.trees"
+        seed = sim.block_seed(c["seed"], 0, block)
         if trees.exists():
             ts = tskit.load(trees)
-            seed = int(np.load(source / f"block_{block:03d}.npz")["seed"]) if source else sim.block_seed(c["seed"], 0, block)
         else:
-            seed = sim.block_seed(c["seed"], 0, block)
             ts = sim.simulate_block(msdem, {p: c["diploid_samples"] for p in POPS}, c["block_cm"],
                                     c["recombination_rate"], c["mutation_rate"], seed, model=c["ancestry_model"])
             ts.dump(trees)
-        if "snp_numer" not in values:
+        if not snp.is_current(values):
             values.update(snp_summaries(ts, c))
         for src in missing:
             if src == "true":

@@ -1,0 +1,112 @@
+// Shared by every model in this folder.  See MATHS.md for the derivation;
+// equation numbers below refer to it.
+
+// Segments per pair per cM with length in [u, v) cM, from coalescences in
+// (t1, t2) of a deme of haploid size N entered with probability 1 at t1:
+//   (1/(50 N)) * int_{t1}^{t2} t exp(-(t - t1)/N) (exp(-u t/50) - exp(-v t/50)) dt   (eq. 6)
+// Same closed form as methods/stan/*_Nfixed*.stan (int_p_LL).
+real segment_density(real N, real t1, real t2, real u, real v) {
+    if (t2 - t1 < 1e-10) return 0.0;
+    real cu = -(1.0 / N + u / 50.0);
+    real cv = -(1.0 / N + v / 50.0);
+    real eu1 = exp(-u * t1 / 50.0);
+    real eu2 = exp((t1 - t2) / N - u * t2 / 50.0);
+    real ev1 = exp(-v * t1 / 50.0);
+    real ev2 = exp((t1 - t2) / N - v * t2 / 50.0);
+    real k1 = 1.0 / (50.0 * N) * (eu2 * (cu * t2 - 1.0) / square(cu) - eu1 * (cu * t1 - 1.0) / square(cu));
+    real k2 = 1.0 / (50.0 * N) * (ev2 * (cv * t2 - 1.0) / square(cv) - ev1 * (cv * t1 - 1.0) / square(cv));
+    return k1 - k2;
+}
+
+// Slot matrices from slot weights (eq. 9-11).  Demes 1..L are the leaves,
+// deme L+1 the admixture's second source ("ghost").
+//   w_admix[x]    weight on "leaf x is the admixed population"
+//   w_merge[k][p] weight on "pair p = (a, b), a < b, merges at merge slot k":
+//                 deme b's lineages move into deme a
+// The last slot is the compulsory root: every deme moves into deme 1.
+// One-hot weights give a discrete graph; any weights give row-stochastic M.
+array[] matrix slot_matrices(vector w_admix, array[] vector w_merge, real f,
+                             data array[,] int pairs, int L) {
+    int D = L + 1;
+    int n_merge = size(w_merge);
+    int K = n_merge + 2;
+    array[K] matrix[D, D] M;
+    matrix[D, D] I = diag_matrix(rep_vector(1.0, D));
+    M[1] = I;
+    for (x in 1:L) {
+        M[1][x, x] = 1.0 - w_admix[x] * (1.0 - f);
+        M[1][x, D] = w_admix[x] * (1.0 - f);
+    }
+    for (k in 1:n_merge) {
+        M[k + 1] = I;
+        for (p in 1:size(pairs)) {
+            int a = pairs[p, 1];
+            int b = pairs[p, 2];
+            M[k + 1][b, b] -= w_merge[k][p];
+            M[k + 1][b, a] += w_merge[k][p];
+        }
+    }
+    M[K] = rep_matrix(0.0, D, D);
+    M[K][:, 1] = rep_vector(1.0, D);
+    return M;
+}
+
+// Log-likelihood components [IBD, SNP] of the data given slot matrices M,
+// cumulative event times t (length K) and one haploid Ne N (eq. 3-8).
+vector graph_loglik(array[] matrix M, vector t, real N,
+                    data array[,] real bins, data real T_max, data real cm,
+                    data array[] int n_samples, data array[,,] int counts,
+                    data matrix w_hat, data matrix w_se, data int use_snp) {
+    int K = size(M);
+    int D = rows(M[1]);
+    int L = size(n_samples);
+    int B = size(bins);
+    real lp_ibd = 0;
+    matrix[L, L] drift = rep_matrix(0.0, L, L);
+    for (i in 1:L) {
+        for (j in i:L) {
+            // ---- IBD: pair-state recursion with coalescence removal (eq. 3-6) ----
+            matrix[D, D] W = rep_matrix(0.0, D, D);
+            W[i, j] = 1.0;
+            vector[B] nu = rep_vector(0.0, B);
+            for (e in 1:(K + 1)) {
+                if (e > 1) W = M[e - 1]' * W * M[e - 1];
+                real t0 = e == 1 ? 0.0 : t[e - 1];
+                real t1 = e == K + 1 ? t[K] + T_max : t[e];
+                for (a in 1:D) {
+                    real w = W[a, a];
+                    if (w > 1e-20) {
+                        for (b in 1:B) nu[b] += w * segment_density(N, t0, t1, bins[b, 1], bins[b, 2]);
+                        W[a, a] = w * exp(-(t1 - t0) / N);
+                    }
+                }
+            }
+            real n_pairs = i == j ? n_samples[i] * (n_samples[i] - 1) / 2.0 : n_samples[i] * 1.0 * n_samples[j];
+            for (b in 1:B) lp_ibd += poisson_lpmf(counts[b, i, j] | fmax(nu[b] * cm * n_pairs, 1e-12));
+            // ---- SNP: drift up to the root, no coalescence removal (eq. 7) ----
+            if (use_snp) {
+                matrix[D, D] V = rep_matrix(0.0, D, D);
+                V[i, j] = 1.0;
+                for (e in 1:K) {
+                    if (e > 1) V = M[e - 1]' * V * M[e - 1];
+                    real dt = t[e] - (e == 1 ? 0.0 : t[e - 1]);
+                    for (a in 1:D) drift[i, j] += V[a, a] * dt / N;
+                }
+                drift[j, i] = drift[i, j];
+            }
+        }
+    }
+    real lp_snp = 0;
+    if (use_snp) {
+        // double centring (eq. 8)
+        vector[L] r;
+        for (i in 1:L) r[i] = mean(drift[i]);
+        real g = mean(r);
+        for (i in 1:L) {
+            for (j in i:L) {
+                lp_snp += normal_lpdf(w_hat[i, j] | drift[i, j] - r[i] - r[j] + g, w_se[i, j]);
+            }
+        }
+    }
+    return [lp_ibd, lp_snp]';
+}

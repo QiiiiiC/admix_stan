@@ -77,8 +77,6 @@ def load_config(path=HERE / "config.json"):
     if "hapibd" in c["sources"]:
         h = c["hapibd"]
         assert 0 < h["min_seed"] and 0 < h["min_output"] <= e[0], "hap-IBD min-output must not truncate the lowest bin"
-    if "trees_from" in c:
-        assert (ROOT / c["trees_from"]).is_dir(), "trees_from must name an existing run pool (relative to the repository root)"
     assert np.isclose(c["block_cm"] / c["snp_se_block_cm"], round(c["block_cm"] / c["snp_se_block_cm"]))
     return c
 

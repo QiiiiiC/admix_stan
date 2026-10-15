@@ -1,9 +1,9 @@
 """Run one design through a list of stages with parallel workers, then publish its summary.
 
     python execute_full.py --stages simulate fit summarize
-    python execute_full.py --config ../four_leaf_b_admixture_varying_ne/pipeline_config.json \\
-        --out ../four_leaf_b_admixture_varying_ne/runs/pipeline \\
-        --publish ../four_leaf_b_admixture_varying_ne/summary/pipeline --stages simulate fit summarize
+    python execute_full.py --config ../four_leaf_b_admixture_varying_ne/config.json \\
+        --out ../four_leaf_b_admixture_varying_ne/runs/default \\
+        --publish ../four_leaf_b_admixture_varying_ne/summary --stages simulate fit summarize
 
 Workers: simulate and fit use --jobs processes; nuts uses --nuts-jobs processes of 4
 chains each.  Every stage resumes from saved files.

@@ -13,7 +13,7 @@ VARYING = s.ROOT / "simulation_study" / "four_leaf_b_admixture_varying_ne"
 class DesignTests(unittest.TestCase):
     def setUp(self):
         self.c = s.load_config()
-        self.v = s.load_config(VARYING / "pipeline_config.json")
+        self.v = s.load_config(VARYING / "config.json")
 
     def test_growth_rule(self):
         ne = s.branch_ne(self.c)
@@ -35,10 +35,10 @@ class DesignTests(unittest.TestCase):
 
     def test_varying_design_blocks_are_its_own_simulation(self):
         """The varying design's saved trees and caches carry the seeds this pipeline
-        would use (block_seed(seed, 0, k)), so they are its own simulation."""
+        uses (block_seed(seed, 0, k)), so its simulate stage would reproduce them."""
         from methods.simulate import block_seed
-        pool = s.ROOT / self.v["trees_from"]
-        caches = sorted((VARYING / "runs" / "pipeline" / "pool_000").glob("block_*.npz"))
+        pool = VARYING / "runs" / "default" / "pool_000"
+        caches = sorted(pool.glob("block_*.npz"))
         self.assertEqual(len(caches), self.v["blocks"])
         for k, cache in enumerate(caches):
             self.assertEqual(int(np.load(cache)["seed"]), block_seed(self.v["seed"], 0, k))
